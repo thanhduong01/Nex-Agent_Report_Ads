@@ -2,6 +2,7 @@ import { groupSchema, getRegistry, saveGroup, GroupError, monthSchema } from "./
 import { sourceSchema } from "./config.ts";
 import { readSpreadsheet } from "./sheets.ts";
 import { inspectTables, validateMapping } from "./mapping.ts";
+import { effectiveSchedule, scheduleSchema } from "./schedule-config.ts";
 
 function sourceId(value: unknown) {
   if (typeof value !== "string") throw new GroupError("Nhập đường dẫn Google Sheets.");
@@ -21,6 +22,16 @@ export async function groupAction(path: string, body: Record<string, unknown>) {
   const registry = await getRegistry();
   const existing = registry.groups.find(g => g.id === body.id);
   const candidate = { ...existing, id: body.id, name: body.name, enabled: body.enabled, sources: { ...existing?.sources } };
+  if (body.schedule !== undefined) {
+    const parsed = scheduleSchema.safeParse(body.schedule);
+    if (!parsed.success) throw new GroupError("Chọn giờ hợp lệ và ít nhất một ngày gửi trong tuần.");
+    const schedule = parsed.data;
+    const previous = effectiveSchedule(existing || { enabled: false });
+    const changed = !existing?.schedule || ["enabled", "time", "days", "reportDay"].some(key =>
+      JSON.stringify(schedule[key as keyof typeof schedule]) !== JSON.stringify(previous[key as keyof typeof previous]));
+    candidate.schedule = { ...schedule, startAt: changed ? new Date().toISOString() : previous.startAt };
+    candidate.enabled = schedule.enabled;
+  }
   if (body.source) {
     const input = body.source as Record<string, unknown>;
     const month = monthSchema.safeParse(input.month);

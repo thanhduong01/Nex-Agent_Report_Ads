@@ -1,4 +1,11 @@
 import { createHash } from "node:crypto";
+import { blobDeliveryStore } from "./blob-delivery.ts";
+
+export const hasDeliveryStorage = () => !!((process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
+  || process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
+function configuredStore(): DeliveryStore {
+  return process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN ? redisStore : blobDeliveryStore;
+}
 
 export class DeliveryError extends Error {
   readonly definitelyRejected: boolean;
@@ -76,12 +83,15 @@ export function deliveryKey(date: string, kind = "daily"): string {
 }
 
 export async function deliverOnce(
-  key: string, text: string, store: DeliveryStore = redisStore,
+  key: string, text: string | (() => Promise<string>), store: DeliveryStore = configuredStore(),
   send: (text: string) => Promise<number> = telegramSend,
 ) {
-  if (!await store.claim(key, text)) return { status: "already-recorded" as const };
+  if (!await store.claim(key, typeof text === "string" ? text : key)) return { status: "already-recorded" as const };
+  let content: string;
+  try { content = typeof text === "string" ? text : await text(); }
+  catch (error) { await store.finish(key, "failed"); throw error; }
   let id: number;
-  try { id = await send(text); }
+  try { id = await send(content); }
   catch (error) {
     await store.finish(key, error instanceof DeliveryError && error.definitelyRejected ? "failed" : "uncertain");
     throw error;

@@ -17,11 +17,19 @@ function setupGroups(data) {
 }
 function updateGroupSchedule() {
   const group = state.groups.find(g => g.id === $("reportGroup").value);
-  $("scheduleStatus").textContent = !group?.enabled ? "Nhóm này đang tạm dừng" : (state.localSendEnabled ? "Đã bật trong cấu hình" : "Chưa bật gửi tự động");
+  const schedule = group?.schedule;
+  $("scheduleTime").textContent = schedule?.time || "09:00";
+  $("scheduleDays").textContent = (schedule?.days.length === 7 ? "Hằng ngày" : (schedule?.days || []).map(d => ["CN", "T2", "T3", "T4", "T5", "T6", "T7"][d]).join(", ")) + " · giờ Việt Nam";
+  $("scheduleStatus").textContent = !schedule?.enabled ? "Nhóm này đang tạm dừng" : (state.canSend ? "Đã bật lịch gửi" : "Cần hoàn tất kết nối Telegram");
+  $("scheduleDetail").textContent = "Báo cáo " + (schedule?.reportDay === "today" ? "hôm nay · đang cập nhật." : "ngày hôm trước.");
 }
 function fillGroup() {
   const group = currentGroup();
-  $("groupName").value = group?.name || ""; $("groupEnabled").checked = group?.enabled || false;
+  const schedule = group?.schedule || { enabled: false, time: "09:00", days: [0, 1, 2, 3, 4, 5, 6], reportDay: "yesterday" };
+  $("groupName").value = group?.name || ""; $("groupEnabled").checked = schedule.enabled;
+  $("groupTime").value = schedule.time; $("groupReportDay").value = schedule.reportDay;
+  for (const input of document.querySelectorAll(".weekdays input")) input.checked = schedule.days.includes(Number(input.value));
+  $("nextRun").textContent = group?.nextRun ? "Lần gửi tiếp theo: " + new Date(group.nextRun).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" }) : "Lịch đang tắt. Chọn giờ và bật khi bạn sẵn sàng.";
   $("groupForm").querySelector("button").disabled = !state.canEditGroups;
   $("sourceList").replaceChildren();
   for (const [month, source] of Object.entries(group?.sources || {}).sort(([a], [b]) => b.localeCompare(a))) {
@@ -52,7 +60,9 @@ function fillGroup() {
   $("month").value = state.defaultDate.slice(0, 7); feedback("sourceFeedback");
 }
 function groupPayload() {
-  return { id: editingGroupId, name: $("groupName").value.trim(), enabled: $("groupEnabled").checked, revision: state.revision };
+  return { id: editingGroupId, name: $("groupName").value.trim(), enabled: $("groupEnabled").checked, revision: state.revision,
+    schedule: { enabled: $("groupEnabled").checked, time: $("groupTime").value, reportDay: $("groupReportDay").value,
+      days: [...document.querySelectorAll(".weekdays input:checked")].map(input => Number(input.value)) } };
 }
 function columnName(index) {
   if (index === null) return "";
@@ -121,7 +131,7 @@ document.getElementById("reportGroup").onchange = () => {
 };
 document.getElementById("groupForm").onsubmit = async event => {
   event.preventDefault(); const button = $("groupForm").querySelector("button"); button.disabled = true;
-  try { await api("group", groupPayload()); updateState(await api("state")); feedback("groupFeedback", "Đã lưu nhóm báo cáo."); }
+  try { await api("group", groupPayload()); updateState(await api("state")); feedback("groupFeedback", "Đã lưu nhóm và lịch gửi."); }
   catch (error) { feedback("groupFeedback", error.message, true); }
   finally { button.disabled = false; }
 };

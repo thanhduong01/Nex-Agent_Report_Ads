@@ -2,8 +2,9 @@ import { getRegistry } from "./groups.ts";
 import { generateText } from "ai";
 import { deliverOnce, deliveryKey } from "./delivery.ts";
 import { liveReport } from "./sheets.ts";
-import { renderReport, yesterday } from "./report.ts";
+import { renderReport } from "./report.ts";
 import type { Report } from "./report.ts";
+import { dueOccurrence, effectiveSchedule } from "./schedule-config.ts";
 
 async function analysis(report: Report): Promise<string> {
   if (process.env.AI_ENABLED !== "true") return "";
@@ -26,19 +27,19 @@ export async function prepareReport(date: string, groupId = "default") {
   return { report, text };
 }
 
-export async function scheduledReport() {
-  if (process.env.SEND_REPORTS !== "true") return { status: "disabled" as const };
-  const date = yesterday();
+export async function scheduledReport(now = new Date()) {
   const registry = await getRegistry();
   const results = [];
-  for (const group of registry.groups.filter(g => g.enabled)) {
-    const kind = group.id === "default" ? "daily" : "group-" + group.id;
+  for (const group of registry.groups) {
+    const occurrence = dueOccurrence(effectiveSchedule(group), now);
+    if (!occurrence) continue;
+    const date = occurrence.reportDate;
+    const kind = "scheduled-" + group.id + "-" + occurrence.key;
     try {
-      const { text } = await prepareReport(date, group.id);
-      results.push({ groupId: group.id, ...await deliverOnce(deliveryKey(date, kind), text) });
+      results.push({ groupId: group.id, ...await deliverOnce(deliveryKey(date, kind), async () => (await prepareReport(date, group.id)).text) });
     } catch {
       try {
-        await deliverOnce(deliveryKey(date, group.id === "default" ? "source-error" : kind + "-error"),
+        await deliverOnce(deliveryKey(date, kind + "-error"),
           `⚠️ Chưa hoàn tất báo cáo ${group.name} ngày ${date}. Kiểm tra nguồn tháng, quyền đọc và lịch sử gửi trước khi chạy lại.`);
       } catch { /* Continue other report groups even when this group's notification fails. */ }
       results.push({ groupId: group.id, status: "failed" });

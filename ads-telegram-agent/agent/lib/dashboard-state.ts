@@ -2,17 +2,20 @@ import { settings } from "./config.ts";
 import { yesterday } from "./report.ts";
 
 import { getRegistry, hasGroupStorage } from "./groups.ts";
+import { hasDeliveryStorage } from "./delivery.ts";
+import { effectiveSchedule, nextOccurrence } from "./schedule-config.ts";
 
 export async function dashboardState(cloud = false) {
   const paired = Boolean(process.env.TELEGRAM_BOT_TOKEN && /^[1-9]\d*$/.test(process.env.TELEGRAM_CHAT_ID || ""));
-  const redis = Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
   const registry = await getRegistry();
   return {
     cloud, defaultDate: yesterday(), deliveryTime: settings.deliveryTime,
     hasToken: !!process.env.TELEGRAM_BOT_TOKEN, paired,
-    canSend: paired && (!cloud || redis),
+    canSend: paired && (!cloud || hasDeliveryStorage()),
+    canConnectCommands: cloud && paired,
     localSendEnabled: process.env.SEND_REPORTS === "true",
-    groups: registry.groups, revision: registry.revision, canEditGroups: !cloud || hasGroupStorage(),
+    groups: registry.groups.map(group => ({ ...group, schedule: effectiveSchedule(group), nextRun: nextOccurrence(effectiveSchedule(group)) })),
+    revision: registry.revision, canEditGroups: !cloud || hasGroupStorage(),
     months: Object.entries(registry.groups.find(g => g.id === "default")?.sources || {}).sort(([a], [b]) => b.localeCompare(a)).map(([month, source]) =>
       ({ month, url: `https://docs.google.com/spreadsheets/d/${source.spreadsheetId}/edit` })),
   };

@@ -21,7 +21,7 @@ Bảng điều khiển local lưu nhóm trong `.data/report-groups.json` và th�
 Giao diện cũng được đóng gói trong `public/` để phục vụ tại đường dẫn gốc
 của bản deploy. API web được đăng ký qua channel `dashboard`. Trên Vercel,
 đặt `DASHBOARD_PASSWORD` là mật khẩu bạn muốn dùng (không để trống) và đăng nhập trước khi xem dữ liệu.
-Cấu hình Telegram trên web được cập nhật qua Environment Variables của project rồi Redeploy. Nhóm báo cáo được quản lý trực tiếp trên web. Gửi thử trên web cần Redis để lưu trạng thái giữa các lần gọi.
+Cấu hình Telegram trên web được cập nhật qua Environment Variables của project rồi Redeploy. Nhóm báo cáo được quản lý trực tiếp trên web. Gửi thử và lệnh Telegram lưu trạng thái trong Vercel Blob riêng tư; Redis là lựa chọn thay thế nếu đã cấu hình.
 
 ## Quy tắc đã chốt
 
@@ -73,8 +73,7 @@ npm run demo -- --output outputs/bao-cao-2026-11-02.txt
    điền ID vào `TELEGRAM_CHAT_ID`.
 5. Để nhận ngay bản thử có số liệu thật, chạy `npm run telegram:preview -- --date 2026-11-02`.
    Mỗi lần chạy lệnh này sẽ gửi một tin có nhãn **BẢN GỬI THỬ** vào chat riêng đã chọn.
-   Bước này chỉ cần token và chat ID khi dùng hai file đã chia sẻ. Redis và lịch
-   production được thiết lập sau ở bước 5–6.
+   Bước này chỉ cần token và chat ID khi dùng hai file đã chia sẻ. Kho lịch sử và lịch production được thiết lập sau ở bước 5–6.
 
 Script chỉ đọc các chat riêng tư từ `getUpdates`, không đổi webhook và không
 gửi tin. Nếu dùng bot đã có webhook ở hệ thống khác, script dừng để tránh xung
@@ -117,7 +116,7 @@ Cùng một file có thể đăng ký cho nhiều tháng với các tab tương 
 3. Bấm **Đọc các tab & nhận diện chỉ số**. Chọn các tab thuộc báo cáo của nhóm.
 4. Mở **Cột dữ liệu** để kiểm tra cột ngày, kiểu ngày, dòng bắt đầu, chi phí Ads, tin nhắn, SĐT và các cột chi tiêu gốc.
 5. Để trống cột SĐT với sản phẩm không theo dõi. Chọn **Kiểm tra & lưu nguồn**.
-6. Chọn nhóm ở **Báo cáo** và xem một ngày đã có dữ liệu. Bật **Gửi báo cáo nhóm này lúc 09:00** khi đã kiểm tra, rồi lưu nhóm.
+6. Chọn nhóm ở **Báo cáo** và xem một ngày đã có dữ liệu. Trong **Lịch gửi tự động**, chọn giờ, ngày trong tuần và ngày lấy số liệu; bật lịch rồi lưu nhóm.
 
 Các mẫu hiện tại hỗ trợ bảng mỗi ngày một dòng, ngày đầy đủ hoặc số ngày 1–31,
 vùng tối đa A1:AZ1000 và tối đa 12 tab trong một nguồn. Cột tổng chi phí Ads được
@@ -131,9 +130,7 @@ cửa sổ khác. Lỗi kho lưu trữ được báo trực tiếp. Local dùng 
 danh sách đã lưu. Khi danh sách đã tồn tại, chỉnh nguồn trên giao diện. File cũ
 vẫn dùng bộ đọc nhận diện tiêu đề để hỗ trợ cột dịch chuyển giữa tháng.
 
-Lịch 09:00 đọc toàn bộ nhóm đã bật, tạo bản tin riêng cho từng nhóm. Lịch sử gửi
-có khóa theo nhóm, ngày và nơi nhận. Một nhóm lỗi được ghi nhận riêng để các nhóm
-còn lại tiếp tục xử lý. `SEND_REPORTS` là công tắc gửi chung.
+Bộ kiểm tra lịch chạy mỗi phút, gửi các nhóm đến hạn theo giờ Việt Nam. Mỗi nhóm có giờ, ngày trong tuần và lựa chọn báo cáo hôm nay/hôm qua riêng. Lịch mới có hiệu lực sau khi lưu, không deploy lại. `SEND_REPORTS` chỉ còn dùng cho nhóm cũ chưa từng lưu lịch trong giao diện; nhóm có lịch riêng được điều khiển hoàn toàn trên web.
 
 ## 5. Xem trước dữ liệu thật và kết nối lịch sử gửi
 
@@ -143,14 +140,7 @@ npm run report -- --date 2026-11-02
 
 Lệnh này chỉ đọc và in báo cáo. Không có `--send` thì không gửi Telegram.
 
-Để lưu lịch sử gửi qua các lần khởi động/deploy, tạo một cơ sở dữ liệu Redis
-trong [Upstash](https://console.upstash.com/redis). Điền hai biến từ phần REST API:
-
-- `UPSTASH_REDIS_REST_URL`
-- `UPSTASH_REDIS_REST_TOKEN`
-
-Báo cáo chính thức và trạng thái gửi được lưu trong Redis. Bản thử qua Telegram
-và lệnh xem trước trên máy có thể chạy trước khi thiết lập Redis.
+Bản web dùng Vercel Blob riêng tư đã kết nối để lưu trạng thái gửi qua các lần deploy. Không cần thêm Redis. Nếu đã có Redis, có thể giữ `UPSTASH_REDIS_REST_URL` và `UPSTASH_REDIS_REST_TOKEN`; ứng dụng sẽ ưu tiên Redis. Không chuyển kho lịch sử khi một lần gửi đang diễn ra.
 
 Gửi thử đến đúng chat đã cấu hình:
 
@@ -162,7 +152,7 @@ Lệnh này **thực sự gửi** một báo cáo. Khóa chống trùng gồm n�
 cáo. Chạy lại ngày đã gửi sẽ không gửi thêm. Nguồn:
 [Upstash Redis REST API](https://upstash.com/docs/redis/features/restapi).
 
-## 6. Triển khai và bật lịch 09:00
+## 6. Triển khai, nhận lệnh Telegram và đặt lịch
 
 Nếu import từ GitHub, để Root Directory ở gốc repository hoặc chọn
 `ads-telegram-agent`. Cấu hình `vercel.json` tại cả hai vị trí đặt Framework
@@ -177,23 +167,24 @@ npm run typecheck
 npm run build
 ```
 
-Liên kết project Vercel bằng `npx eve link`. Trong Vercel Environment Variables,
-điền cấu hình Google, Telegram, Redis và nguồn theo tháng. Giữ `SEND_REPORTS=false`
-cho đến khi gửi thử thành công. Không đưa `.env.local` hoặc khóa JSON lên Git.
+Liên kết project Vercel bằng `npx eve link`. Cấu hình `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `DASHBOARD_PASSWORD` và kết nối Blob riêng tư. Không đưa `.env.local` hoặc khóa JSON lên Git.
 
-```bash
-npx eve deploy
-```
+Sau khi deploy, vào **Kết nối → Bot Telegram → Kết nối lệnh Telegram**. Bộ kiểm tra lịch cũng tự kết nối webhook khi chạy lần đầu trên production. Bot đã có webhook ở hệ thống khác sẽ được giữ nguyên và báo cần kiểm tra. Webhook xác thực bằng secret HMAC từ token bot (hoặc `TELEGRAM_WEBHOOK_SECRET_TOKEN` nếu bạn tự cấu hình); token không đưa xuống trình duyệt.
 
-Sau khi xác nhận nơi nhận và dữ liệu đúng, đặt `SEND_REPORTS=true` cho môi trường
-Production, redeploy, rồi kiểm tra **Settings → Cron Jobs** có lịch 09:00 giờ
-Việt Nam (02:00 UTC). Xem lịch sử chạy trong **Observability → Cron Jobs / Logs**.
-Chọn gói hosting có độ chính xác lịch chạy phù hợp yêu cầu 09:00; thời điểm
-thực tế phụ thuộc scheduler và thời gian xử lý, không cam kết đúng từng giây.
+Lệnh trong chat riêng đã cấu hình:
 
-Lịch `eve dev` không tự chạy; `npm run dev` chỉ phục vụ phát triển. Triển khai
-cloud mới giúp bot chạy khi máy tính tắt. Nếu tự host phải dùng `eve start`
-và giữ tiến trình chạy, với múi giờ tiến trình là UTC cho lịch hiện tại.
+- `/baocao`: số liệu hôm nay của tất cả nhóm có nguồn, kể cả nhóm đang tắt lịch.
+- `/baocao Thượng Hải`: hôm nay của một nhóm; có thể dùng mã nhóm từ `/nhom`.
+- `/baocao 02/11/2026 Thượng Hải`: báo cáo ngày chỉ định. Cũng hỗ trợ `YYYY-MM-DD`.
+- `/homqua`: số liệu hôm qua; `/nhom`: danh sách nhóm; `/lich`: lịch và liên kết cấu hình; `/help`: hướng dẫn.
+
+Bot chỉ nhận lệnh từ đúng chat riêng và người gửi trùng `TELEGRAM_CHAT_ID`. Lệnh được xử lý trực tiếp, không cần AI Gateway. Mỗi tin nhắn mới đọc lại Sheets; cập nhật gửi lại cùng message ID không gửi lặp. Số liệu hôm nay mang nhãn đang cập nhật.
+
+Đặt lịch trong **Kết nối → chọn nhóm → Lịch gửi tự động**. Chọn giờ Việt Nam, ngày trong tuần, hôm nay/hôm qua và bật/tắt; bấm **Lưu nhóm & lịch gửi**. Nút bật lịch trên web là công tắc của nhóm, không cần chỉnh biến môi trường nữa. Lịch cũ chưa bật gửi tự động vẫn tắt khi nâng cấp.
+
+Kiểm tra **Settings → Cron Jobs** có bộ kiểm tra `* * * * *`. Cần gói Vercel hỗ trợ cron mỗi phút (Pro/Enterprise); Hobby không hỗ trợ và deployment sẽ bị từ chối. Không tự nâng gói. Thời điểm thực tế còn phụ thuộc lịch chạy của nền tảng và thời gian đọc Sheets. Bộ kiểm tra bù các lần đến hạn trong vòng 2 giờ, chống gửi trùng bằng khóa nhóm/ngày/giờ/nơi nhận. Khi đổi lịch, không gửi bù giờ trước thời điểm bạn lưu.
+
+`eve dev` không tự chạy lịch. Chạy cloud để bot hoạt động khi máy tính tắt; bản local UI phục vụ cấu hình và xem trước, không đăng ký webhook hoặc tự gửi lịch.
 
 Nguồn: [Eve schedules](https://eve.dev/docs/schedules),
 [Eve deployment](https://eve.dev/docs/guides/deployment/vercel).
@@ -207,7 +198,7 @@ chỉ số đã tính, không nhận các tab thưởng/sale. Phần nhận xét
 Nếu AI lỗi, báo cáo số liệu vẫn được gửi. Dùng AI có phát sinh usage theo model.
 
 Trong hội thoại Eve, tool `read_daily_report` cho phép hỏi dữ liệu theo ngày.
-Telegram ở phiên bản này là kênh nhận thông báo, chưa có chức năng hỏi đáp.
+Telegram hỗ trợ các lệnh báo cáo xác định phía trên; chưa có hội thoại AI tự do.
 Agent chỉ được cấp tool đọc báo cáo; các công cụ shell, sửa file, tìm web và
 ủy nhiệm mặc định của framework đã được tắt.
 
@@ -217,15 +208,14 @@ Agent chỉ được cấp tool đọc báo cáo; các công cụ shell, sửa f
   bằng 0 nhưng chi tiêu gốc trống vẫn được xem là chưa nhập, không kết luận đã dừng.
 - Chưa đăng ký file tháng mới hoặc mất quyền đọc: gửi thông báo lỗi nguồn một
   lần cho ngày đó. Sau khi sửa, chạy `npm run send -- --date YYYY-MM-DD`.
-- Google Sheets lỗi tạm thời: thử đọc tối đa 3 lần. Phiên bản này không có lịch
-  tự đọc bổ sung sau 09:00 nếu nhân viên nhập muộn.
+- Google Sheets lỗi tạm thời: thử đọc tối đa 3 lần. Sau khi lần gửi lịch đã thành công, dùng /baocao để lấy số liệu mới nếu nhân viên nhập bổ sung.
 - Telegram trả lỗi rõ ràng 4xx: lưu `failed`; có thể chạy lại sau khi sửa.
 - Timeout hoặc kết quả gửi không rõ: lưu `uncertain`; nếu tiến trình chết có
   thể còn `pending`. Không tự gửi lại để tránh gửi trùng. Kiểm tra Telegram và
-  bản ghi `ads:*` trong Redis; nếu xác nhận chưa nhận, đổi trạng thái thành
+  bản ghi lịch sử trong Blob hoặc Redis; nếu xác nhận chưa nhận, đổi trạng thái thành
   `failed` rồi chạy lại. Không thể bảo đảm exactly-once khi API gửi tin không
   hỗ trợ khóa idempotency. Bản ghi `sent` giữ mã tin nhắn để đối chiếu.
-- Nếu Telegram hoặc Redis không truy cập được thì không thể thông báo lỗi qua
+- Nếu Telegram hoặc kho lịch sử không truy cập được thì không thể thông báo lỗi qua
   chính kênh đó; cần xem log hosting. Không có kênh cảnh báo dự phòng.
 - Chưa đặt ngưỡng đánh giá CPL/tin nhắn vì chưa có mục tiêu kinh doanh. Hiện chỉ
   nêu sự kiện có chi phí nhưng kết quả bằng 0, không tự đổi ngân sách quảng cáo.

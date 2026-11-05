@@ -60,6 +60,8 @@ function updateState(data) {
   $("settingsEyebrow").textContent = data.cloud ? "CẤU HÌNH TRÊN VERCEL" : "CẤU HÌNH TRÊN MÁY";
   $("pairForm").hidden = data.cloud;
   $("cloudTelegram").hidden = !data.cloud;
+  $("commandsBox").hidden = !data.cloud;
+  $("connectCommands").disabled = !data.canConnectCommands;
   $("scheduleTime").textContent = data.deliveryTime;
   $("scheduleStatus").textContent = data.localSendEnabled ? "Đã bật trong cấu hình" : "Chưa bật gửi tự động";
   const paired = data.paired;
@@ -131,7 +133,7 @@ $("preview").onclick = () => {
   $("draft").textContent = current.text;
   $("dialogConnect").hidden = state.paired; $("send").hidden = !state.paired;
   $("send").disabled = !!current.sent || !state.canSend;
-  feedback("sendFeedback", current.sent ? "Đã gửi bản thử này vào Telegram." : (state.paired && !state.canSend ? "Thêm cấu hình Redis trên Vercel để lưu lịch sử và gửi thử." : ""));
+  feedback("sendFeedback", current.sent ? "Đã gửi bản thử này vào Telegram." : (state.paired && !state.canSend ? "Kết nối kho lưu lịch sử gửi trước khi gửi thử." : ""));
   $("dialog").showModal();
 };
 $("close").onclick = () => $("dialog").close();
@@ -191,3 +193,12 @@ async function init() {
   }
 }
 init();
+$("connectCommands").onclick = async () => {
+  const button = $("connectCommands"); button.disabled = true;
+  feedback("commandsFeedback", "Đang kết nối lệnh với Telegram…");
+  try {
+    const result = await api("telegram-connect", {});
+    feedback("commandsFeedback", result.connected ? "Đã kết nối. Mở Telegram và gõ /baocao để nhận báo cáo hôm nay." : "Chưa xác nhận kết nối. Thử lại sau.", !result.connected);
+  } catch (error) { feedback("commandsFeedback", error.message, true); }
+  finally { button.disabled = false; }
+};

@@ -4,12 +4,14 @@ import { get, put } from "@vercel/blob";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
+import { scheduleSchema } from "./schedule-config.ts";
 
 export const monthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
 export const groupSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]{1,64}$/),
   name: z.string().trim().min(1).max(80),
   enabled: z.boolean(),
+  schedule: scheduleSchema.optional(),
   sources: z.record(monthSchema, sourceSchema),
 });
 export type ReportGroup = z.infer<typeof groupSchema>;

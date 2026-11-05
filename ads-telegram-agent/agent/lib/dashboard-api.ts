@@ -6,6 +6,7 @@ import { authenticated, passwordConfigured, passwordMatches, sessionCookie, sign
 import { prepareReport } from "./job.ts";
 import { deliveryKey, deliverOnce } from "./delivery.ts";
 import { validateDate, yesterday } from "./report.ts";
+import { connectTelegram, telegramConnection } from "./telegram-setup.ts";
 
 export async function dashboardApi(request: Request) {
   const url = new URL(request.url);
@@ -34,6 +35,11 @@ export async function dashboardApi(request: Request) {
       return json(200, { ok: true }, { "Set-Cookie": sessionCookie(request) });
     }
     if (!authenticated(request)) return json(401, { code: "login", error: "Đăng nhập để xem báo cáo." });
+    if (!isPost && url.pathname === "/api/telegram-status") return json(200, await telegramConnection());
+    if (isPost && url.pathname === "/api/telegram-connect") {
+      await connectTelegram(true);
+      return json(200, await telegramConnection());
+    }
     if (isPost && url.pathname === "/api/logout")
       return json(200, { ok: true }, { "Set-Cookie": sessionCookie(request, true) });
     if (!isPost && url.pathname === "/api/state") return json(200, await dashboardState(true));
@@ -46,7 +52,7 @@ export async function dashboardApi(request: Request) {
     }
     if (isPost && url.pathname === "/api/send") {
       if (!(await dashboardState(true)).canSend)
-        return json(409, { error: "Cần cấu hình Telegram và Redis trên Vercel trước khi gửi thử." });
+        return json(409, { error: "Cần cấu hình Telegram và kho lưu lịch sử gửi trước khi gửi thử." });
       const draft = typeof body.id === "string" ? verify(body.id) : null;
       if (!draft || draft.purpose !== "preview" || typeof draft.text !== "string" ||
           typeof draft.date !== "string" || typeof draft.nonce !== "string" ||

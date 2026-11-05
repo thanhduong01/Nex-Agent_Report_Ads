@@ -41,8 +41,8 @@
 </div>
 <aside>
 <section class="ticket" aria-labelledby="scheduleTitle"><div class="ticketHead"><span class="ticketIcon"><svg class="icon"><use href="#i-clock"/></svg></span><h2 id="scheduleTitle">Lịch gửi báo cáo</h2></div>
-<div class="timeLine"><strong id="scheduleTime">09:00</strong><span>Hằng ngày<br>giờ Việt Nam</span></div>
-<div class="tear"><span></span></div><div class="ticketBottom"><span class="ticketLabel">TRẠNG THÁI LỊCH</span><b id="scheduleStatus">Đang kiểm tra…</b><small>Gửi kết quả của ngày hôm trước.</small></div></section>
+<div class="timeLine"><strong id="scheduleTime">09:00</strong><span id="scheduleDays">Hằng ngày<br>giờ Việt Nam</span></div>
+<div class="tear"><span></span></div><div class="ticketBottom"><span class="ticketLabel">TRẠNG THÁI LỊCH</span><b id="scheduleStatus">Đang kiểm tra…</b><small id="scheduleDetail">Gửi kết quả của ngày hôm trước.</small><a href="#settings" class="textLink">Chỉnh lịch gửi</a></div></section>
 <section class="panel telegramBox"><div class="panelHead"><span class="roundIcon"><svg class="icon"><use href="#i-plane"/></svg></span><div><h2>Kênh Telegram</h2><p id="telegramState">Đang kiểm tra…</p></div></div>
 <button class="primary wide" id="preview" disabled>Xem trước bản tin<svg class="icon"><use href="#i-arrow"/></svg></button><a href="#settings" class="textLink" id="pairLink">Kết nối Telegram</a></section>
 </aside></div></section>
@@ -51,11 +51,17 @@
 <div class="setupGrid"><section class="panel setup"><div class="sectionLine"><h2>Bot Telegram</h2><span class="pill" id="botBadge"></span></div>
 <p>Mở <a href="https://t.me/BotFather" target="_blank" rel="noreferrer">BotFather</a> và dùng lệnh <code>/newbot</code> để lấy token.</p>
 <p class="hint" id="cloudTelegram" hidden>Trên Vercel, điền TELEGRAM_BOT_TOKEN và TELEGRAM_CHAT_ID trong Settings → Environment Variables, rồi Redeploy. Bạn có thể ghép nối bot trên bảng điều khiển local trước.</p><form id="pairForm"><label for="token">Bot token</label><input id="token" type="password" autocomplete="off" spellcheck="false"><p class="hint" id="tokenHint">Token được lưu trên máy sau khi ghép nối.</p><button class="primary">Tạo liên kết ghép nối</button></form>
-<div id="pairNext" hidden><p><a id="openBot" target="_blank" rel="noreferrer">Mở bot trong Telegram</a> và nhấn <b>Start</b>. Liên kết có hiệu lực 10 phút.</p><button class="secondary" id="confirm">Đã nhấn Start · Xác nhận</button></div><p class="feedback" id="pairFeedback" role="status"></p></section>
+<div id="pairNext" hidden><p><a id="openBot" target="_blank" rel="noreferrer">Mở bot trong Telegram</a> và nhấn <b>Start</b>. Liên kết có hiệu lực 10 phút.</p><button class="secondary" id="confirm">Đã nhấn Start · Xác nhận</button></div><p class="feedback" id="pairFeedback" role="status"></p>
+<div id="commandsBox" hidden><h3>Lấy báo cáo trong Telegram</h3><p><code>/baocao</code> lấy số liệu hôm nay của tất cả nhóm.<br><code>/baocao 02/11/2026 Thượng Hải</code> chọn ngày và nhóm.<br><code>/homqua</code>, <code>/nhom</code>, <code>/lich</code> để xem thêm.</p><button id="connectCommands" class="secondary">Kết nối lệnh Telegram</button><p id="commandsFeedback" class="feedback" role="status"></p></div></section>
 <section class="panel setup groupManager"><div class="sectionLine"><h2>Nhóm báo cáo &amp; nguồn dữ liệu</h2><button id="newGroup" class="secondary">+ Tạo nhóm</button></div>
 <p class="hint" id="storageStatus">Mỗi nhóm có danh sách nguồn và cách đọc chỉ số riêng.</p>
 <label for="settingsGroup">Chọn nhóm</label><select id="settingsGroup"></select>
-<form id="groupForm"><label for="groupName">Tên nhóm báo cáo</label><input id="groupName" maxlength="80" required><label class="checkLabel"><input id="groupEnabled" type="checkbox">Gửi báo cáo nhóm này lúc 09:00</label><p class="hint">Áp dụng khi Telegram và lịch gửi chung đã được bật.</p><button class="secondary">Lưu nhóm</button></form><p id="groupFeedback" class="feedback" role="status"></p>
+<form id="groupForm"><label for="groupName">Tên nhóm báo cáo</label><input id="groupName" maxlength="80" required>
+<fieldset class="scheduleEditor"><legend>Lịch gửi tự động</legend><label class="checkLabel"><input id="groupEnabled" type="checkbox">Bật lịch cho nhóm này</label>
+<div class="mappingGrid"><label>Giờ gửi · Việt Nam<input id="groupTime" type="time" value="09:00" required></label><label>Ngày lấy số liệu<select id="groupReportDay"><option value="yesterday">Hôm qua</option><option value="today">Hôm nay (đang cập nhật)</option></select></label></div>
+<fieldset class="weekdays"><legend>Ngày gửi trong tuần</legend><label><input type="checkbox" value="1" checked>T2</label><label><input type="checkbox" value="2" checked>T3</label><label><input type="checkbox" value="3" checked>T4</label><label><input type="checkbox" value="4" checked>T5</label><label><input type="checkbox" value="5" checked>T6</label><label><input type="checkbox" value="6" checked>T7</label><label><input type="checkbox" value="0" checked>CN</label></fieldset>
+<p id="nextRun" class="hint"></p><p class="hint">Lưu để áp dụng lịch mới. Bot chỉ gửi vào chat riêng đã kết nối. Bạn vẫn có thể gõ /baocao khi tắt lịch.</p></fieldset>
+<button class="secondary">Lưu nhóm &amp; lịch gửi</button></form><p id="groupFeedback" class="feedback" role="status"></p>
 <ul id="sourceList"></ul>
 <details id="sourceEditor"><summary id="sourceSummary">Thêm file báo cáo</summary>
 <form id="sourceForm"><label for="month">Tháng báo cáo</label><input type="month" id="month" required>
