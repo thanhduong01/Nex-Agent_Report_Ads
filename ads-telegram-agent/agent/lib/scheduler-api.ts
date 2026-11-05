@@ -15,7 +15,11 @@ export async function schedulerApi(request: Request, deps = defaults) {
   if (!token || token.length > 16000) return response(401, { error: "Scheduler authentication required" });
   let identity;
   try { identity = await deps.verify(token); }
-  catch { return response(401, { error: "Invalid scheduler identity" }); }
+  catch (error) {
+    const code = typeof error === "object" && error && "code" in error ? String(error.code) : "identity-or-origin";
+    console.warn("Scheduler authentication rejected", /^[A-Z_]+$/.test(code) ? code : "identity-or-origin");
+    return response(401, { error: "Invalid scheduler identity" });
+  }
   try {
     const text = await request.text();
     if (text.length > 1024) return response(413, { error: "Request too large" });
