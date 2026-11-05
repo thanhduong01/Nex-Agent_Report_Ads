@@ -1,0 +1,88 @@
+name: Report scheduler
+
+on:
+  schedule:
+    - cron: '2-57/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Check connection only, or send reports that are due'
+        type: choice
+        options: [probe, run]
+        default: probe
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/report-scheduler.yml'
+      - 'ads-telegram-agent/agent/lib/scheduler-*.ts'
+
+# No repository write access, PAT, Telegram token, or dashboard password.
+permissions:
+  id-token: write
+
+concurrency:
+  group: report-scheduler-production
+  cancel-in-progress: false
+
+jobs:
+  check-schedules:
+    if: github.repository == 'thanhduong01/Nex-Agent_Report_Ads'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      REPORT_ENDPOINT: https://nex-agent-report-ads.vercel.app/api/schedule-tick
+      RUN_MODE: ${{ github.event_name == 'schedule' && 'run' || inputs.mode || 'probe' }}
+      EVENT_NAME: ${{ github.event_name }}
+    steps:
+      - name: Apply schedules saved in the dashboard
+        shell: python
+        run: |
+          import json, os, sys, time, urllib.request, urllib.parse, urllib.error
+
+          endpoint = os.environ['REPORT_ENDPOINT']
+
+          def post(body):
+              # Mint a fresh, short-lived token for each request; never log it.
+              oidc_url = os.environ['ACTIONS_ID_TOKEN_REQUEST_URL']
+              oidc_url += ('&' if '?' in oidc_url else '?') + urllib.parse.urlencode({'audience': endpoint})
+              auth = urllib.request.Request(oidc_url, headers={
+                  'Authorization': 'Bearer ' + os.environ['ACTIONS_ID_TOKEN_REQUEST_TOKEN']})
+              with urllib.request.urlopen(auth, timeout=30) as response:
+                  token = json.load(response)['value']
+              request = urllib.request.Request(endpoint, data=json.dumps(body).encode(), headers={
+                  'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'}, method='POST')
+              with urllib.request.urlopen(request, timeout=300) as response:
+                  result = json.load(response)
+              if not result.get('ok'):
+                  raise RuntimeError('Scheduler rejected the operation')
+              return result
+
+          # A push checks the new deployment without sending any report.
+          if os.environ['RUN_MODE'] == 'probe':
+              attempts = 16 if os.environ['EVENT_NAME'] == 'push' else 1
+              for attempt in range(attempts):
+                  try:
+                      post({'mode': 'probe'})
+                      print('PASS: GitHub identity accepted by the production scheduler. No report sent.')
+                      sys.exit(0)
+                  except Exception:
+                      if attempt + 1 == attempts:
+                          sys.exit('Connection check failed. Verify the Vercel deployment and scheduler authentication.')
+                      time.sleep(20)
+
+          try:
+              result = post({'mode': 'check'})
+              failures = 0
+              for group_id in result['due']:
+                  try:
+                      post({'mode': 'run', 'groupId': group_id})
+                  except Exception:
+                      failures += 1
+              # Only counts are logged; reports and sheet identifiers stay on Vercel.
+              print('Checked saved schedules. Due:', len(result['due']), 'Failed:', failures)
+              if not result.get('telegramConnected'):
+                  print('::warning::Telegram commands need attention in the dashboard connection settings.')
+              if failures:
+                  sys.exit('Some reports could not be delivered. Check application configuration and delivery history.')
+          except Exception:
+              sys.exit('Scheduler request failed. Check the production deployment and its logs.')
