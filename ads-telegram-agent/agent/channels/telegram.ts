@@ -1,10 +1,11 @@
 import { telegramChannel } from "eve/channels/telegram";
 import { handleTelegramCommand } from "../lib/telegram-commands.ts";
 import { webhookSecret } from "../lib/telegram-setup.ts";
+import { botToken } from "../lib/telegram-token.ts";
 
 export default telegramChannel({
   uploadPolicy: "disabled",
-  credentials: { webhookSecretToken: webhookSecret },
+  credentials: { botToken, webhookSecretToken: webhookSecret },
   async onMessage(_ctx, message) {
     await handleTelegramCommand(message);
     return null;

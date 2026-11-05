@@ -1,9 +1,9 @@
 import { createHmac } from "node:crypto";
 import { getRegistry } from "./groups.ts";
+import { botToken } from "./telegram-token.ts";
 
 export function webhookSecret() {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) throw new Error("Chưa cấu hình bot Telegram.");
+  const token = botToken();
   return process.env.TELEGRAM_WEBHOOK_SECRET_TOKEN || createHmac("sha256", token).update("tram-ads/webhook/v1").digest("hex");
 }
 export function productionOrigin() {
@@ -12,8 +12,7 @@ export function productionOrigin() {
   return "https://" + hostname;
 }
 async function telegramApi(method: string, payload: object = {}) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) throw new Error("Chưa cấu hình bot Telegram.");
+  const token = botToken();
   let failure = "Không kết nối được Telegram. Kiểm tra bot token và thử lại.";
   try {
     const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {

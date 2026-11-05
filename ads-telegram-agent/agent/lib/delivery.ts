@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { blobDeliveryStore } from "./blob-delivery.ts";
+import { botToken } from "./telegram-token.ts";
 
 export const hasDeliveryStorage = () => !!((process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
   || process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
@@ -50,8 +51,11 @@ export const redisStore: DeliveryStore = {
 };
 
 export async function telegramSend(text: string): Promise<number> {
-  const token = process.env.TELEGRAM_BOT_TOKEN, chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!token || !chatId) throw new DeliveryError("Thiếu TELEGRAM_BOT_TOKEN hoặc TELEGRAM_CHAT_ID.", true);
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!chatId) throw new DeliveryError("Thiếu TELEGRAM_CHAT_ID.", true);
+  let token: string;
+  try { token = botToken(); }
+  catch (error) { throw new DeliveryError((error as Error).message, true); }
   if (text.length > 4096) throw new DeliveryError("Báo cáo vượt giới hạn độ dài Telegram.", true);
   let res: Response;
   try {
