@@ -28,7 +28,7 @@ Hướng dẫn kết nối, quy tắc tính số liệu, kiểm tra và triển 
 
 Import repository vào Vercel và dùng Node.js 24. Để **Root Directory** ở gốc repository hoặc chọn `ads-telegram-agent`. Cả hai vị trí đều có `vercel.json` cấu hình build và giao diện web.
 
-Trong **Settings → Environment Variables**, thêm `DASHBOARD_PASSWORD` gồm ít nhất 16 ký tự để đăng nhập web. Sau đó kết nối một Vercel Blob store **private** vào project để lưu các nhóm. Trên web, vào **Kết nối → Nhóm báo cáo & nguồn dữ liệu** để thêm nhóm, file, tháng và chọn các tab/cột. Mỗi lần lưu có hiệu lực ngay. `REPORT_SOURCES_JSON` được hỗ trợ để nhập cấu hình cũ lần đầu.
+Trong **Settings → Environment Variables**, thêm `DASHBOARD_PASSWORD` là mật khẩu bạn muốn dùng (không để trống) để đăng nhập web. Sau đó kết nối một Vercel Blob store **private** vào project để lưu các nhóm. Trên web, vào **Kết nối → Nhóm báo cáo & nguồn dữ liệu** để thêm nhóm, file, tháng và chọn các tab/cột. Mỗi lần lưu có hiệu lực ngay. `REPORT_SOURCES_JSON` được hỗ trợ để nhập cấu hình cũ lần đầu.
 
 Để gửi Telegram, thêm `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `UPSTASH_REDIS_REST_URL` và `UPSTASH_REDIS_REST_TOKEN`. Bật `SEND_REPORTS=true` sau khi cấu hình nơi nhận và gửi thử thành công.
 

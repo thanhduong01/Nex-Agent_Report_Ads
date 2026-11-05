@@ -2,7 +2,7 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 const cookieName = "tram_ads_session";
 export function passwordConfigured() {
-  return (process.env.DASHBOARD_PASSWORD?.length ?? 0) >= 16;
+  return Boolean(process.env.DASHBOARD_PASSWORD?.trim());
 }
 
 function equal(a: string, b: string) {

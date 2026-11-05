@@ -14,10 +14,11 @@ function request(path: string, body?: object, cookie?: string, origin = base) {
   });
 }
 
-test("hosted dashboard blocks data until login and rejects cross-origin writes", async t => {
+for (const passwordBytes of [4, 24]) {
+test(`hosted dashboard protects data and sessions with a ${passwordBytes * 2}-character password`, async t => {
   const previous = process.env.DASHBOARD_PASSWORD;
   t.after(() => { if (previous === undefined) delete process.env.DASHBOARD_PASSWORD; else process.env.DASHBOARD_PASSWORD = previous; });
-  const password = randomBytes(24).toString("hex");
+  const password = randomBytes(passwordBytes).toString("hex");
   process.env.DASHBOARD_PASSWORD = password;
   assert.equal((await dashboardApi(request("/api/state"))).status, 401);
   assert.equal((await dashboardApi(request("/api/report?date=2026-11-02"))).status, 401);
@@ -34,15 +35,20 @@ test("hosted dashboard blocks data until login and rejects cross-origin writes",
   const logout = await dashboardApi(request("/api/logout", {}, cookie));
   assert.match(logout.headers.get("set-cookie")!, /Max-Age=0/);
 });
+}
 
-test("hosted dashboard shows setup without exposing sources when its password is missing", async t => {
+test("hosted dashboard shows setup without exposing sources when its password is missing or blank", async t => {
   const previous = process.env.DASHBOARD_PASSWORD;
-  delete process.env.DASHBOARD_PASSWORD;
-  t.after(() => { if (previous !== undefined) process.env.DASHBOARD_PASSWORD = previous; });
-  const response = await dashboardApi(request("/api/state"));
-  assert.equal(response.status, 503);
-  const body = await response.json();
-  assert.equal(body.code, "setup"); assert.equal(body.months, undefined);
+  t.after(() => { if (previous === undefined) delete process.env.DASHBOARD_PASSWORD; else process.env.DASHBOARD_PASSWORD = previous; });
+  for (const password of [undefined, "", " \t "]) {
+    if (password === undefined) delete process.env.DASHBOARD_PASSWORD;
+    else process.env.DASHBOARD_PASSWORD = password;
+    const response = await dashboardApi(request("/api/state"));
+    assert.equal(response.status, 503);
+    const body = await response.json();
+    assert.equal(body.code, "setup"); assert.equal(body.months, undefined);
+    assert.equal((await dashboardApi(request("/api/login", {password: password ?? ""}))).status, 503);
+  }
 });
 
 test("preview signatures survive worker restarts and cannot be used as a login session", async t => {

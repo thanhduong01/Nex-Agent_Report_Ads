@@ -20,7 +20,7 @@ Bảng điều khiển local lưu nhóm trong `.data/report-groups.json` và th�
 
 Giao diện cũng được đóng gói trong `public/` để phục vụ tại đường dẫn gốc
 của bản deploy. API web được đăng ký qua channel `dashboard`. Trên Vercel,
-đặt `DASHBOARD_PASSWORD` gồm ít nhất 16 ký tự và đăng nhập trước khi xem dữ liệu.
+đặt `DASHBOARD_PASSWORD` là mật khẩu bạn muốn dùng (không để trống) và đăng nhập trước khi xem dữ liệu.
 Cấu hình Telegram trên web được cập nhật qua Environment Variables của project rồi Redeploy. Nhóm báo cáo được quản lý trực tiếp trên web. Gửi thử trên web cần Redis để lưu trạng thái giữa các lần gọi.
 
 ## Quy tắc đã chốt

@@ -15,9 +15,7 @@ export async function dashboardApi(request: Request) {
     } });
   if (request.headers.get("x-tram-ads") !== "1") return json(403, { error: "Hãy mở bảng điều khiển." });
   if (!passwordConfigured()) return json(503, {
-    code: "setup", error: process.env.DASHBOARD_PASSWORD
-      ? "DASHBOARD_PASSWORD đang có ít hơn 16 ký tự. Cập nhật mật khẩu trong Vercel → Settings → Environment Variables cho Production, rồi deploy lại."
-      : "Ứng dụng chưa nhận được DASHBOARD_PASSWORD. Thêm mật khẩu ít nhất 16 ký tự trong Vercel → Settings → Environment Variables cho Production, rồi deploy lại.",
+    code: "setup", error: "Chưa cấu hình mật khẩu quản trị. Điền DASHBOARD_PASSWORD trong Vercel → Settings → Environment Variables cho Production, rồi deploy lại.",
   });
   const isPost = request.method === "POST";
   if (isPost && (request.headers.get("origin") !== url.origin || request.headers.get("content-type") !== "application/json"))
