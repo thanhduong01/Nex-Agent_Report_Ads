@@ -11,3 +11,5 @@ tests/
 scripts/dashboard/
 scripts/report.ts
 scripts/telegram-chat.ts
+
+.data/

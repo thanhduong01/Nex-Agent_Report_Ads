@@ -58,8 +58,8 @@ function updateState(data) {
   $("locationLabel").textContent = data.cloud ? "Bản web" : "Trên máy này";
   $("logout").hidden = !data.cloud;
   $("settingsEyebrow").textContent = data.cloud ? "CẤU HÌNH TRÊN VERCEL" : "CẤU HÌNH TRÊN MÁY";
-  $("pairForm").hidden = data.cloud; $("sourceEditor").hidden = data.cloud;
-  $("cloudTelegram").hidden = !data.cloud; $("cloudSources").hidden = !data.cloud;
+  $("pairForm").hidden = data.cloud;
+  $("cloudTelegram").hidden = !data.cloud;
   $("scheduleTime").textContent = data.deliveryTime;
   $("scheduleStatus").textContent = data.localSendEnabled ? "Đã bật trong cấu hình" : "Chưa bật gửi tự động";
   const paired = data.paired;
@@ -69,12 +69,7 @@ function updateState(data) {
   $("botBadge").className = "pill " + (paired ? "good" : "warn");
   $("token").required = !data.hasToken;
   $("tokenHint").textContent = data.hasToken ? "Để trống để dùng token đã lưu, hoặc nhập token của bot mới." : "Token được lưu trên máy sau khi ghép nối.";
-  $("sourceList").replaceChildren(...data.months.map(source => {
-    const li = el("li"), [year, month] = source.month.split("-");
-    const a = external("File tháng " + month + "/" + year, source.url);
-    const arrow = el("span", "↗"); arrow.setAttribute("aria-hidden", "true"); a.append(arrow); li.append(a); return li;
-  }));
-  if (!data.months.length) $("sourceList").append(el("li", "Chưa đăng ký file báo cáo."));
+  setupGroups(data);
 }
 function summaryMetric(id, total, count) {
   const node = $(id); node.textContent = total.known ? nf.format(total.value) : "—";
@@ -117,7 +112,7 @@ async function loadReport() {
     if (!date || !$("date").validity.valid) throw new Error("Chọn một ngày báo cáo hợp lệ.");
     const displayDate = longDate.format(new Date(date + "T00:00:00Z"));
     $("dateDescription").textContent = displayDate[0].toLocaleUpperCase("vi") + displayDate.slice(1);
-    const data = await api("report?date=" + encodeURIComponent(date));
+    const data = await api("report?date=" + encodeURIComponent(date) + "&group=" + encodeURIComponent($("reportGroup").value || "default"));
     if (serial !== requestNumber) return;
     current = data; showReport(data); $("preview").disabled = false;
   } catch (error) {
@@ -169,15 +164,6 @@ $("confirm").onclick = async () => {
   } catch (error) { feedback("pairFeedback", error.message, true); }
   finally { $("confirm").disabled = false; }
 };
-$("sourceForm").onsubmit = async event => {
-  event.preventDefault();
-  const button = $("sourceForm").querySelector("button"); button.disabled = true;
-  try {
-    updateState(await api("source", { month: $("month").value, url: $("sheetUrl").value }));
-    $("sourceForm").reset(); feedback("sourceFeedback", "Đã lưu nguồn trên máy. Chọn ngày thuộc tháng vừa thêm để đọc báo cáo.");
-  } catch (error) { feedback("sourceFeedback", error.message, true); }
-  finally { button.disabled = false; }
-};
 window.addEventListener("hashchange", route);
 $("loginForm").onsubmit = async event => {
   event.preventDefault();
@@ -199,7 +185,7 @@ async function init() {
   try {
     updateState(await api("state"));
     $("date").value = new URLSearchParams(location.search).get("date") || state.defaultDate;
-    await loadReport();
+    if (state.groups.length) await loadReport();
   } catch (error) {
     if ($("accessView").hidden) { $("fatal").hidden = false; $("fatal").textContent = error.message; }
   }

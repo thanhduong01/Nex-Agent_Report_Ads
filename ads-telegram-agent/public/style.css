@@ -171,3 +171,23 @@ dialog pre { font: 14px/1.6 var(--body); background: var(--bg); padding: 16px; b
 #logout { margin-left: -24px; }
 #cloudTelegram, #cloudSources { overflow-wrap: anywhere; margin-top: 16px; }
 @media (max-width: 760px) { #logout { margin-left: 0; padding: 8px; } .accessPanel { margin: 32px auto; } }
+select { font: inherit; color: var(--ink); background: var(--paper); border: 1px solid #bdcbdb; border-radius: 9px; min-height: 44px; padding: 8px 12px; max-width: 100%; }
+.reportFilters { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; }
+.reportFilters label { display: block; font-size: 13px; font-weight: 650; margin-bottom: 6px; }
+.reportFilters select { max-width: 240px; }
+.setupGrid { grid-template-columns: minmax(270px, .85fr) minmax(0, 1.6fr); }
+.groupManager select { width: 100%; }
+.checkLabel { display: flex !important; align-items: center; gap: 9px; min-height: 44px; }
+.checkLabel input { width: 18px; height: 18px; min-height: auto; margin: 0; accent-color: var(--blue); }
+#sourceList .sourceItem { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+#sourceList .sourceItem a { border: 0; padding: 0; }
+.sourceItem small { display: block; color: var(--muted); max-width: 360px; overflow-wrap: anywhere; }
+.sourceActions { display: flex; gap: 6px; }
+.mappingCard { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin: 14px 0; min-width: 0; }
+.mappingCard legend { max-width: 100%; overflow-wrap: anywhere; }
+.mappingCard .hint { font-size: 12px; }
+.mappingGrid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.mappingGrid label { font-size: 12px; margin: 0; }
+.mappingGrid input, .mappingGrid select { margin-top: 5px; width: 100%; }
+.mappingHint { margin-top: 12px; }
+@media (max-width: 760px) { .setupGrid { grid-template-columns: 1fr; } .reportFilters { width: 100%; gap: 12px; } .reportFilters>div:first-child { width: 100%; } .reportFilters select { max-width: 100%; width: 100%; } .sourceActions { flex-wrap: wrap; } }

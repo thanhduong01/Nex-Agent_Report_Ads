@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Trạm Ads · Báo cáo quảng cáo</title><link rel="icon" href="/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Trạm Ads · Báo cáo quảng cáo</title><link rel="icon" href="/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css"><script src="/groups.js" defer></script><script src="/app.js" defer></script></head>
 <body>
 <svg xmlns="http://www.w3.org/2000/svg" class="definitions" aria-hidden="true"><defs>
 <symbol id="i-report" viewBox="0 0 24 24"><path d="M4 4v16h16M8 15v-4m5 4V6m5 9v-6"/></symbol>
@@ -27,7 +27,7 @@
 <form id="loginForm"><label for="password">Mật khẩu quản trị</label><input type="password" id="password" autocomplete="current-password" required><button class="primary">Đăng nhập</button></form><p id="loginFeedback" class="feedback" role="status"></p></section>
 <section id="reportView" aria-labelledby="reportTitle">
 <div class="headline"><div><div class="eyebrow"><i></i>BẢN TIN HẰNG NGÀY</div><h1 id="reportTitle">Báo cáo quảng cáo</h1><p id="dateDescription">Kết quả quảng cáo theo ngày báo cáo.</p></div>
-<div class="filters"><label for="date">Ngày báo cáo</label><div class="inline"><input type="date" id="date" required><button id="reload" class="iconBtn" aria-label="Tải lại báo cáo" title="Tải lại báo cáo"><svg class="icon"><use href="#i-refresh"/></svg></button></div></div></div>
+<div class="reportFilters"><div><label for="reportGroup">Nhóm báo cáo</label><select id="reportGroup"></select></div><div class="filters"><label for="date">Ngày báo cáo</label><div class="inline"><input type="date" id="date" required><button id="reload" class="iconBtn" aria-label="Tải lại báo cáo" title="Tải lại báo cáo"><svg class="icon"><use href="#i-refresh"/></svg></button></div></div></div></div>
 <div class="board"><div class="leftCol">
 <section aria-labelledby="summaryTitle"><div class="sectionLine"><h2 id="summaryTitle">Tổng quan</h2><span class="pill" id="quality">Đang đọc dữ liệu</span></div>
 <div class="metricGrid">
@@ -52,8 +52,18 @@
 <p>Mở <a href="https://t.me/BotFather" target="_blank" rel="noreferrer">BotFather</a> và dùng lệnh <code>/newbot</code> để lấy token.</p>
 <p class="hint" id="cloudTelegram" hidden>Trên Vercel, điền TELEGRAM_BOT_TOKEN và TELEGRAM_CHAT_ID trong Settings → Environment Variables, rồi Redeploy. Bạn có thể ghép nối bot trên bảng điều khiển local trước.</p><form id="pairForm"><label for="token">Bot token</label><input id="token" type="password" autocomplete="off" spellcheck="false"><p class="hint" id="tokenHint">Token được lưu trên máy sau khi ghép nối.</p><button class="primary">Tạo liên kết ghép nối</button></form>
 <div id="pairNext" hidden><p><a id="openBot" target="_blank" rel="noreferrer">Mở bot trong Telegram</a> và nhấn <b>Start</b>. Liên kết có hiệu lực 10 phút.</p><button class="secondary" id="confirm">Đã nhấn Start · Xác nhận</button></div><p class="feedback" id="pairFeedback" role="status"></p></section>
-<section class="panel setup"><div class="sectionLine"><h2>Nguồn Google Sheets</h2><svg class="icon mutedIcon"><use href="#i-sheet"/></svg></div>
-<ul id="sourceList"></ul><p class="hint" id="cloudSources" hidden>Thêm các tháng vào REPORT_SOURCES_JSON trong Vercel → Settings → Environment Variables, rồi Redeploy. Dùng cấu hình nguồn đã lưu trong .env.local trên máy.</p><details id="sourceEditor"><summary>Thêm file cho tháng mới</summary><form id="sourceForm"><label for="month">Tháng báo cáo</label><input type="month" id="month" required><label for="sheetUrl">Đường dẫn Google Sheets</label><input type="url" id="sheetUrl" required placeholder="https://docs.google.com/spreadsheets/…"><p class="hint">Dùng file có cùng các tab sản phẩm. Agent cần quyền đọc file.</p><button class="secondary">Lưu nguồn tháng</button></form></details><p class="feedback" id="sourceFeedback" role="status"></p></section></div>
+<section class="panel setup groupManager"><div class="sectionLine"><h2>Nhóm báo cáo &amp; nguồn dữ liệu</h2><button id="newGroup" class="secondary">+ Tạo nhóm</button></div>
+<p class="hint" id="storageStatus">Mỗi nhóm có danh sách nguồn và cách đọc chỉ số riêng.</p>
+<label for="settingsGroup">Chọn nhóm</label><select id="settingsGroup"></select>
+<form id="groupForm"><label for="groupName">Tên nhóm báo cáo</label><input id="groupName" maxlength="80" required><label class="checkLabel"><input id="groupEnabled" type="checkbox">Gửi báo cáo nhóm này lúc 09:00</label><p class="hint">Áp dụng khi Telegram và lịch gửi chung đã được bật.</p><button class="secondary">Lưu nhóm</button></form><p id="groupFeedback" class="feedback" role="status"></p>
+<ul id="sourceList"></ul>
+<details id="sourceEditor"><summary id="sourceSummary">Thêm file báo cáo</summary>
+<form id="sourceForm"><label for="month">Tháng báo cáo</label><input type="month" id="month" required>
+<label for="sheetUrl">Đường dẫn Google Sheets</label><input type="url" id="sheetUrl" required placeholder="https://docs.google.com/spreadsheets/…">
+<button class="secondary" type="button" id="inspectSource">Đọc các tab &amp; nhận diện chỉ số</button>
+<p class="hint mappingHint">Một file có thể dùng cho nhiều tháng. Chọn đúng tab cho tháng đang cấu hình.</p>
+<div id="mappingList"></div><button class="primary" id="saveSource" disabled>Kiểm tra &amp; lưu nguồn</button>
+</form></details><p class="feedback" id="sourceFeedback" role="status"></p></section></div>
 </section>
 <p id="fatal" role="alert" hidden></p>
 <footer><span>Trạm Ads</span><span>Google Sheets <span aria-hidden="true">→</span> Telegram</span></footer>

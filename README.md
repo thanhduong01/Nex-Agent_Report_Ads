@@ -16,7 +16,7 @@ cp .env.example .env.local
 npm run ui
 ```
 
-Mở [Trạm Ads](http://127.0.0.1:4317), vào **Kết nối** để đăng ký file Sheets và ghép nối bot Telegram. Cấu hình nguồn và thông tin đăng nhập được lưu trong `.env.local` riêng của môi trường chạy.
+Mở [Trạm Ads](http://127.0.0.1:4317), vào **Kết nối** để đăng ký file Sheets và ghép nối bot Telegram. Nhóm và nguồn trên máy được lưu trong `.data/report-groups.json`, thông tin đăng nhập trong `.env.local`.
 
 ## Gửi tự động
 
@@ -28,11 +28,11 @@ Hướng dẫn kết nối, quy tắc tính số liệu, kiểm tra và triển 
 
 Import repository vào Vercel và dùng Node.js 24. Để **Root Directory** ở gốc repository hoặc chọn `ads-telegram-agent`. Cả hai vị trí đều có `vercel.json` cấu hình build và giao diện web.
 
-Trong **Settings → Environment Variables**, thêm `DASHBOARD_PASSWORD` gồm ít nhất 16 ký tự để đăng nhập web và `REPORT_SOURCES_JSON` chứa danh sách nguồn theo tháng. Dùng giá trị nguồn đã lưu trong `.env.local` trên máy.
+Trong **Settings → Environment Variables**, thêm `DASHBOARD_PASSWORD` gồm ít nhất 16 ký tự để đăng nhập web. Sau đó kết nối một Vercel Blob store **private** vào project để lưu các nhóm. Trên web, vào **Kết nối → Nhóm báo cáo & nguồn dữ liệu** để thêm nhóm, file, tháng và chọn các tab/cột. Mỗi lần lưu có hiệu lực ngay. `REPORT_SOURCES_JSON` được hỗ trợ để nhập cấu hình cũ lần đầu.
 
 Để gửi Telegram, thêm `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `UPSTASH_REDIS_REST_URL` và `UPSTASH_REDIS_REST_TOKEN`. Bật `SEND_REPORTS=true` sau khi cấu hình nơi nhận và gửi thử thành công.
 
-Redeploy sau khi đổi biến môi trường. Bản web đọc cấu hình từ Vercel. Bảng điều khiển local hỗ trợ ghép bot và lưu cấu hình vào `.env.local`.
+Redeploy sau khi đổi biến môi trường. Nhóm và nguồn được quản lý trực tiếp trong bảng điều khiển. Thông tin bot trên local lưu trong `.env.local`.
 
 ## Kiểm tra
 

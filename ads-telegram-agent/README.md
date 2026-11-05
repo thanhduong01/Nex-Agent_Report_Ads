@@ -14,15 +14,14 @@ rồi chạy `npm run ui`. Giữ cửa sổ Terminal mở và vào
 1. Ở **Báo cáo**, chọn ngày để xem chi phí, tin nhắn, SĐT và số sản phẩm đã nhập từng chỉ số. Bấm **Xem trước bản tin** để đọc nội dung sẽ gửi.
 2. Ở **Kết nối**, dán token của BotFather rồi chọn **Tạo liên kết ghép nối**. Mở liên kết, nhấn **Start** trong Telegram và quay lại bấm **Đã nhấn Start · Xác nhận**. Chỉ cuộc trò chuyện riêng có mã ghép nối đó được lưu. [Cơ chế liên kết của Telegram](https://core.telegram.org/bots/features#deep-linking).
 3. Trở lại bản xem trước, chọn **Gửi thử vào chat đã kết nối** rồi kiểm tra tin nhắn trong Telegram.
-4. Khi cài đặt lần đầu hoặc sang tháng mới, mở **Kết nối → Nguồn Google Sheets → Thêm file cho tháng mới**. Chọn một ngày của tháng vừa thêm để kiểm tra quyền đọc và các tab.
+4. Mở **Kết nối → Nhóm báo cáo & nguồn dữ liệu**, tạo nhóm, chọn tháng, dán đường dẫn Sheets và chọn **Đọc các tab & nhận diện chỉ số**. Chọn tab và kiểm tra các cột rồi lưu nguồn.
 
-Bảng điều khiển lưu cấu hình vào `.env.local` trên máy. Để chạy lịch 09:00 độc lập với máy tính, thực hiện các bước 5 và 6 bên dưới rồi cập nhật cấu hình trên Vercel khi đổi bot hoặc thêm nguồn.
+Bảng điều khiển local lưu nhóm trong `.data/report-groups.json` và thông tin bot trong `.env.local`. Bản web lưu nhóm vào Vercel Blob riêng tư. Nhóm và nguồn mới có hiệu lực sau khi lưu. Để chạy lịch 09:00 độc lập với máy tính, thực hiện các bước 5 và 6 bên dưới.
 
 Giao diện cũng được đóng gói trong `public/` để phục vụ tại đường dẫn gốc
 của bản deploy. API web được đăng ký qua channel `dashboard`. Trên Vercel,
 đặt `DASHBOARD_PASSWORD` gồm ít nhất 16 ký tự và đăng nhập trước khi xem dữ liệu.
-Các cấu hình Telegram và nguồn tháng trên web được cập nhật qua Environment Variables
-của project, rồi Redeploy. Gửi thử trên web cần Redis để lưu trạng thái giữa các lần gọi.
+Cấu hình Telegram trên web được cập nhật qua Environment Variables của project rồi Redeploy. Nhóm báo cáo được quản lý trực tiếp trên web. Gửi thử trên web cần Redis để lưu trạng thái giữa các lần gọi.
 
 ## Quy tắc đã chốt
 
@@ -108,31 +107,33 @@ cầu `spreadsheets.readonly`. IAM role trên Cloud không thay cho quyền chia
 Nguồn: [Tạo credentials và chia sẻ file](https://developers.google.com/workspace/guides/create-credentials),
 [Quyền Sheets API](https://developers.google.com/workspace/sheets/api/scopes).
 
-## 4. Đăng ký file từng tháng
+## 4. Quản lý nhóm và nguồn động
 
-Danh sách file được lưu trong `REPORT_SOURCES_JSON` ở `.env.local` và
-Environment Variables của cloud. Ví dụ cấu hình cho một tháng:
+Mỗi nhóm có tên, trạng thái gửi hằng ngày và danh sách nguồn theo tháng.
+Cùng một file có thể đăng ký cho nhiều tháng với các tab tương ứng.
 
-```dotenv
-REPORT_SOURCES_JSON='{"2026-12":{"spreadsheetId":"ID_FILE_THANG_12"}}'
-```
+1. Vào **Kết nối**, chọn **Tạo nhóm** và đặt tên.
+2. Chọn tháng và dán đường dẫn Google Sheets.
+3. Bấm **Đọc các tab & nhận diện chỉ số**. Chọn các tab thuộc báo cáo của nhóm.
+4. Mở **Cột dữ liệu** để kiểm tra cột ngày, kiểu ngày, dòng bắt đầu, chi phí Ads, tin nhắn, SĐT và các cột chi tiêu gốc.
+5. Để trống cột SĐT với sản phẩm không theo dõi. Chọn **Kiểm tra & lưu nguồn**.
+6. Chọn nhóm ở **Báo cáo** và xem một ngày đã có dữ liệu. Bật **Gửi báo cáo nhóm này lúc 09:00** khi đã kiểm tra, rồi lưu nhóm.
 
-`spreadsheetId` là đoạn giữa `/d/` và `/edit` trong đường dẫn Google Sheets.
-Giữ lại các tháng cũ để so sánh qua đầu tháng. Mỗi tháng cần một mục
-có `spreadsheetId` trong cấu hình.
+Các mẫu hiện tại hỗ trợ bảng mỗi ngày một dòng, ngày đầy đủ hoặc số ngày 1–31,
+vùng tối đa A1:AZ1000 và tối đa 12 tab trong một nguồn. Cột tổng chi phí Ads được
+đọc theo ánh xạ. Các cột chi tiêu gốc giúp phân biệt ô trống với công thức trả 0.
 
-Nếu muốn ghi nhận đã chốt dữ liệu, thêm `confirmedThrough: "2026-11-02"` vào
-đúng tháng sau khi người phụ trách xác nhận; không tự lấy ngày đọc làm ngày chốt.
-Nếu chưa có mốc xác nhận, báo cáo vẫn gửi nhưng ghi rõ là số liệu tại lúc đọc.
-Giữ tên tab, ba hàng tiêu đề và tên các chỉ số như mẫu. Các cột có thể dịch chuyển
-trong A:M; agent nhận diện theo tiêu đề. Nếu thêm cột vượt M cần mở rộng vùng
-đọc trong `sheets.ts`. Agent báo lỗi khi thiếu/trùng tiêu đề hoặc trùng dòng ngày.
+Danh sách nhóm trên web lưu ở Vercel Blob riêng tư qua `BLOB_READ_WRITE_TOKEN`
+do kết nối Storage tạo. Mỗi lần lưu kiểm tra phiên bản để bảo vệ thay đổi từ
+cửa sổ khác. Lỗi kho lưu trữ được báo trực tiếp. Local dùng file riêng trong `.data/`.
 
-Mỗi tháng bạn chỉ cần đăng ký ID mới và chia sẻ file cho service account.
-Với file đã cho phép tải theo liên kết, bạn cũng có thể thêm `"allowSharedExport":true`
-vào cấu hình của riêng tháng đó.
-Agent chọn file theo tháng của ngày báo cáo. Đường dẫn nguồn thực được lưu
-riêng trong cấu hình của từng môi trường.
+`REPORT_SOURCES_JSON` chỉ phục vụ nhập cấu hình cũ vào nhóm mặc định khi chưa có
+danh sách đã lưu. Khi danh sách đã tồn tại, chỉnh nguồn trên giao diện. File cũ
+vẫn dùng bộ đọc nhận diện tiêu đề để hỗ trợ cột dịch chuyển giữa tháng.
+
+Lịch 09:00 đọc toàn bộ nhóm đã bật, tạo bản tin riêng cho từng nhóm. Lịch sử gửi
+có khóa theo nhóm, ngày và nơi nhận. Một nhóm lỗi được ghi nhận riêng để các nhóm
+còn lại tiếp tục xử lý. `SEND_REPORTS` là công tắc gửi chung.
 
 ## 5. Xem trước dữ liệu thật và kết nối lịch sử gửi
 

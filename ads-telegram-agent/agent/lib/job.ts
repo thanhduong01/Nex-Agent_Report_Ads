@@ -1,3 +1,4 @@
+import { getRegistry } from "./groups.ts";
 import { generateText } from "ai";
 import { deliverOnce, deliveryKey } from "./delivery.ts";
 import { liveReport } from "./sheets.ts";
@@ -17,8 +18,8 @@ async function analysis(report: Report): Promise<string> {
   } catch { return "Phần nhận xét AI tạm thời không khả dụng; số liệu vẫn được tính bằng công thức."; }
 }
 
-export async function prepareReport(date: string) {
-  const report = await liveReport(date);
+export async function prepareReport(date: string, groupId = "default") {
+  const report = await liveReport(date, groupId);
   let text = renderReport(report);
   const notes = await analysis(report);
   if (notes) text += `\n\nNhận xét AI:\n${notes}`;
@@ -28,12 +29,20 @@ export async function prepareReport(date: string) {
 export async function scheduledReport() {
   if (process.env.SEND_REPORTS !== "true") return { status: "disabled" as const };
   const date = yesterday();
-  let text: string;
-  try { text = (await prepareReport(date)).text; }
-  catch {
-    await deliverOnce(deliveryKey(date, "source-error"),
-      `⚠️ Chưa tạo được báo cáo quảng cáo ngày ${date}. Kiểm tra file tháng ${date.slice(0, 7)}, quyền đọc Google Sheets và cấu trúc các tab. Sau khi sửa, chạy lại báo cáo cho ngày này.`);
-    throw new Error(`Không tạo được báo cáo ${date}; đã xử lý thông báo lỗi nguồn.`);
+  const registry = await getRegistry();
+  const results = [];
+  for (const group of registry.groups.filter(g => g.enabled)) {
+    const kind = group.id === "default" ? "daily" : "group-" + group.id;
+    try {
+      const { text } = await prepareReport(date, group.id);
+      results.push({ groupId: group.id, ...await deliverOnce(deliveryKey(date, kind), text) });
+    } catch {
+      try {
+        await deliverOnce(deliveryKey(date, group.id === "default" ? "source-error" : kind + "-error"),
+          `⚠️ Chưa hoàn tất báo cáo ${group.name} ngày ${date}. Kiểm tra nguồn tháng, quyền đọc và lịch sử gửi trước khi chạy lại.`);
+      } catch { /* Continue other report groups even when this group's notification fails. */ }
+      results.push({ groupId: group.id, status: "failed" });
+    }
   }
-  return deliverOnce(deliveryKey(date), text);
+  return results;
 }

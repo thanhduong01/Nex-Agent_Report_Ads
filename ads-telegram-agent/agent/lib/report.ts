@@ -114,6 +114,8 @@ export function aggregate(rows: Row[]) {
 
 export type Report = {
   date: string;
+  groupId?: string;
+  groupName?: string;
   fetchedAt: string;
   sourceUrl: string;
   confirmed: boolean;
@@ -123,15 +125,15 @@ export type Report = {
   previous7: ReturnType<typeof aggregate> | null;
 };
 
-export function buildReport(date: string, byMonth: Record<string, Tables>, source: Source, now = new Date()): Report {
+export function buildReport(date: string, byMonth: Record<string, Tables>, source: Source, now = new Date(), readRows = dayRows): Report {
   validateDate(date);
   const tables = byMonth[date.slice(0, 7)];
   if (!tables) throw new Error(`Chưa cấu hình file cho tháng ${date.slice(0, 7)}.`);
-  const rows = dayRows(tables, date);
+  const rows = readRows(tables, date);
   const history: Row[][] = [];
   for (let i = 1; i <= 7; i++) {
     const d = shiftDate(date, -i), t = byMonth[d.slice(0, 7)];
-    if (t) history.push(dayRows(t, d));
+    if (t) history.push(readRows(t, d));
   }
   const prevDate = shiftDate(date, -1), prevTables = byMonth[prevDate.slice(0, 7)];
   return {
@@ -139,7 +141,7 @@ export function buildReport(date: string, byMonth: Record<string, Tables>, sourc
     sourceUrl: `https://docs.google.com/spreadsheets/d/${source.spreadsheetId}/edit`,
     confirmed: !!source.confirmedThrough && validateDate(source.confirmedThrough) >= date,
     rows, totals: aggregate(rows),
-    previous: prevTables ? aggregate(dayRows(prevTables, prevDate)) : null,
+    previous: prevTables ? aggregate(readRows(prevTables, prevDate)) : null,
     previous7: history.length === 7 ? aggregate(history.flat()) : null,
   };
 }
@@ -151,14 +153,16 @@ const metric = (x: { value: number; complete: boolean; known: number }, currency
 
 export function renderReport(report: Report): string {
   const { totals: t } = report;
+  const trackedCount = report.rows.filter(r => r.tracksPhones).length;
   const lines = [
     `📊 BÁO CÁO QUẢNG CÁO — ${report.date.split("-").reverse().join("/")}`,
+    ...(report.groupName ? [report.groupName] : []),
     `Chi phí: ${metric(t.cost, true)}`,
     `Tin nhắn: ${metric(t.messages)}`,
-    `SĐT (3 sản phẩm có theo dõi): ${metric(t.phones)}`,
+    `SĐT (${trackedCount} sản phẩm có theo dõi): ${metric(t.phones)}`,
   ];
   if (t.costPerMessage !== null) lines.push(`Chi phí/tin nhắn: ${money(t.costPerMessage)}`);
-  if (t.costPerPhone !== null) lines.push(`Chi phí/SĐT (không gồm Khách Sạn): ${money(t.costPerPhone)}`);
+  if (t.costPerPhone !== null) lines.push(`Chi phí/SĐT (sản phẩm có theo dõi): ${money(t.costPerPhone)}`);
   if (report.previous?.cost.complete && t.cost.complete && report.previous.cost.value > 0) {
     const delta = (t.cost.value / report.previous.cost.value - 1) * 100;
     lines.push(`Chi phí so với ngày trước: ${delta >= 0 ? "+" : ""}${delta.toFixed(1)}%`);

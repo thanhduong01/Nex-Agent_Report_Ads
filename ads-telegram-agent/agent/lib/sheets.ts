@@ -1,8 +1,11 @@
 import { GoogleAuth } from "google-auth-library";
-import { readSheet } from "read-excel-file/node";
-import { products, sources } from "./config.ts";
+import readXlsxFile, { readSheet } from "read-excel-file/node";
+import { products } from "./config.ts";
 import type { Source } from "./config.ts";
 import { buildReport, shiftDate, validateDate } from "./report.ts";
+import { getGroup } from "./groups.ts";
+import { mappedRows } from "./mapping.ts";
+import { dayRows } from "./report.ts";
 import type { Tables } from "./report.ts";
 
 async function googleRead(url: URL, headers: Record<string, string> = {}): Promise<Response> {
@@ -21,7 +24,7 @@ async function googleRead(url: URL, headers: Record<string, string> = {}): Promi
   throw new Error("Không đọc được Google Sheets.");
 }
 
-async function readSharedExport(id: string): Promise<Tables> {
+async function readSharedExport(id: string, names?: string[]): Promise<Tables> {
   const url = new URL(`https://docs.google.com/spreadsheets/d/${id}/export?format=xlsx`);
   const response = await googleRead(url);
   if (response.headers.get("content-type")?.includes("text/html")) {
@@ -31,20 +34,23 @@ async function readSharedExport(id: string): Promise<Tables> {
   const buffer = Buffer.from(await response.arrayBuffer());
   if (buffer.length < 4 || buffer.readUInt32BE(0) !== 0x504b0304)
     throw new Error("Google không trả bản xuất Excel hợp lệ.");
+  if (buffer.length > 15 * 1024 * 1024) throw new Error("Google Sheets vượt giới hạn 15 MB cho bản xuất.");
+  const sheets = names ? await Promise.all(names.map(async sheet => ({ sheet, data: await readSheet(buffer, sheet) }))) : await readXlsxFile(buffer);
   const tables: Tables = {};
-  for (const product of products) {
-    const rows = await readSheet(buffer, product.name);
-    tables[product.name] = rows.slice(0, 64).map(row => row.slice(0, 13).map(cell =>
-      cell === null || typeof cell === "string" || typeof cell === "number" || typeof cell === "boolean" ? cell : null
+  for (const { sheet, data } of sheets) {
+    tables[sheet] = data.slice(0, 1000).map(row => row.slice(0, 52).map(cell =>
+      cell instanceof Date ? cell.toISOString().slice(0, 10) :
+      typeof cell === "string" || typeof cell === "number" || typeof cell === "boolean" ? cell : null
     ));
   }
   return tables;
 }
 
-async function readSpreadsheet(source: Source): Promise<Tables> {
+export async function readSpreadsheet(source: Source, inspect = false): Promise<Tables> {
   const id = source.spreadsheetId;
+  let names = inspect ? undefined : (source.mappings?.map(m => m.sheet) ?? products.map(p => p.name));
   if (source.allowSharedExport && !process.env.GOOGLE_SERVICE_ACCOUNT_JSON && !process.env.GOOGLE_APPLICATION_CREDENTIALS
-      && process.env.SHEETS_REQUIRE_AUTH !== "true") return readSharedExport(id);
+      && process.env.SHEETS_REQUIRE_AUTH !== "true") return readSharedExport(id, names);
   let credentials;
   try { credentials = process.env.GOOGLE_SERVICE_ACCOUNT_JSON ? JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON) : undefined; }
   catch { throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON không phải JSON hợp lệ."); }
@@ -56,18 +62,25 @@ async function readSpreadsheet(source: Source): Promise<Tables> {
   try { token = await auth.getAccessToken(); }
   catch { throw new Error("Không xác thực được tài khoản Google. Kiểm tra credentials và quyền Viewer."); }
   if (!token) throw new Error("Thiếu access token Google.");
+  if (!names) {
+    const metaUrl = new URL(`https://sheets.googleapis.com/v4/spreadsheets/${id}`);
+    metaUrl.searchParams.set("fields", "sheets.properties.title");
+    const meta = await (await googleRead(metaUrl, { Authorization: `Bearer ${token}` })).json();
+    names = meta.sheets.map((s: { properties: { title: string } }) => s.properties.title);
+  }
   const url = new URL(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values:batchGet`);
   url.searchParams.set("valueRenderOption", "UNFORMATTED_VALUE");
-  for (const p of products) url.searchParams.append("ranges", `'${p.name.replaceAll("'", "''")}'!A1:M64`);
+  for (const name of names!) url.searchParams.append("ranges", `'${name.replaceAll("'", "''")}'!A1:AZ1000`);
   const res = await googleRead(url, { Authorization: `Bearer ${token}` });
   const body = await res.json() as { valueRanges?: { values?: Tables[string] }[] };
-  if (body.valueRanges?.length !== products.length) throw new Error("Google Sheets trả thiếu vùng dữ liệu.");
-  return Object.fromEntries(products.map((p, i) => [p.name, body.valueRanges![i].values ?? []]));
+  if (body.valueRanges?.length !== names!.length) throw new Error("Google Sheets trả thiếu vùng dữ liệu.");
+  return Object.fromEntries(names!.map((name, i) => [name, body.valueRanges![i].values ?? []]));
 }
 
-export async function liveReport(date: string) {
+export async function liveReport(date: string, groupId = "default") {
   validateDate(date);
-  const registry = sources(), month = date.slice(0, 7), source = registry[month];
+  const group = await getGroup(groupId);
+  const registry = group.sources, month = date.slice(0, 7), source = registry[month];
   if (!source) throw new Error(`Chưa có file Google Sheets cho tháng ${month}. Cần thêm file tháng mới.`);
   const months = new Set([month, shiftDate(date, -7).slice(0, 7)]);
   const byMonth: Record<string, Tables> = {};
@@ -76,5 +89,9 @@ export async function liveReport(date: string) {
     try { byMonth[key] = await readSpreadsheet(registry[key]); }
     catch (error) { if (key === month) throw error; }
   }
-  return buildReport(date, byMonth, source);
+  const report = buildReport(date, byMonth, source, new Date(), (tables, d) => {
+    const mappings = registry[d.slice(0, 7)]?.mappings;
+    return mappings ? mappedRows(tables, d, mappings) : dayRows(tables, d);
+  });
+  return { ...report, groupId: group.id, groupName: group.name };
 }

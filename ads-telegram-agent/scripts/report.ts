@@ -1,13 +1,13 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { sources } from "../agent/lib/config.ts";
+import { getGroup } from "../agent/lib/groups.ts";
 import { buildReport, renderReport, shiftDate, validateDate, yesterday } from "../agent/lib/report.ts";
 import type { Tables } from "../agent/lib/report.ts";
 
 async function main() {
   const { values } = parseArgs({ options: {
-    date: { type: "string" }, demo: { type: "boolean", default: false },
+    date: { type: "string" }, group: { type: "string", default: "default" }, demo: { type: "boolean", default: false },
     send: { type: "boolean", default: false }, output: { type: "string" },
     "telegram-preview": { type: "boolean", default: false },
   } });
@@ -21,7 +21,7 @@ async function main() {
     const fixture = JSON.parse(await readFile(new URL(`../fixtures/${month}.json`, import.meta.url), "utf8")) as {
       month: string; fetchedAt: string; tables: Tables;
     };
-    const source = sources()[date.slice(0, 7)];
+    const source = (await getGroup(values.group)).sources[date.slice(0, 7)];
     if (!source || month !== fixture.month) throw new Error("Chưa có dữ liệu mẫu cho tháng này.");
     const byMonth = { [fixture.month]: fixture.tables };
     const previousMonth = shiftDate(date, -7).slice(0, 7);
@@ -34,7 +34,7 @@ async function main() {
     text = "BẢN XEM TRƯỚC TỪ DỮ LIỆU ĐÃ TẢI\n\n" + renderReport(buildReport(date, byMonth, source, new Date(fixture.fetchedAt)));
   } else {
     const { prepareReport } = await import("../agent/lib/job.ts");
-    text = (await prepareReport(date)).text;
+    text = (await prepareReport(date, values.group)).text;
   }
   if (values.output) {
     const path = resolve(values.output);
@@ -49,7 +49,7 @@ async function main() {
     console.log(`Đã gửi bản thử. Mã tin nhắn ${messageId}.`);
   } else if (values.send) {
     const { deliverOnce, deliveryKey } = await import("../agent/lib/delivery.ts");
-    console.log(JSON.stringify(await deliverOnce(deliveryKey(date), text)));
+    console.log(JSON.stringify(await deliverOnce(deliveryKey(date, values.group === "default" ? "daily" : "group-" + values.group), text)));
   } else console.log(text);
 }
 
