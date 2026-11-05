@@ -18,6 +18,8 @@ test("scheduler verifies signed GitHub identity, expiry, audience, exact workflo
     .setProtectedHeader({ alg: "RS256", kid: "test" }).setIssuedAt().setExpirationTime(expiration)
     .setIssuer("https://token.actions.githubusercontent.com").setAudience(aud).setSubject(`repo:${schedulerRepository}:ref:refs/heads/main`).sign(privateKey);
   assert.deepEqual(await verifySchedulerToken(await sign(), audience, keys), { runId: "123" });
+  assert.deepEqual(await verifySchedulerToken(await sign({ repository_id: 1446546918, repository_owner_id: 28723913,
+    job_workflow_ref: claims.workflow_ref }), audience, keys), { runId: "123" });
   for (const patch of [{ repository_id: "other" }, { repository_owner_id: "other" }, { repository: "attacker/fork" },
     { ref: "refs/heads/feature" }, { workflow_ref: `${schedulerRepository}/other.yml@refs/heads/main` },
     { job_workflow_ref: "attacker/reusable.yml" }, { event_name: "pull_request" }]) {

@@ -31,7 +31,12 @@ export async function schedulerApi(request: Request, deps = defaults) {
       const registry = await deps.registry();
       const due = registry.groups.filter(g => dueOccurrence(effectiveSchedule(g), now)).map(g => g.id);
       let telegramConnected = true;
-      try { await deps.connect(); } catch { telegramConnected = false; }
+      try { await deps.connect(); } catch (error) {
+        telegramConnected = false;
+        const message = error instanceof Error ? error.message : "";
+        console.warn("Telegram command setup incomplete:", /^(Bot đang|Chưa cấu hình|Không kết nối được Telegram|Chỉ kết nối bot)/.test(message)
+          ? message : "Kiểm tra kết nối trong bảng điều khiển.");
+      }
       await deps.record({ checkedAt: now.toISOString(), runId: identity.runId,
         enabled: registry.groups.filter(g => effectiveSchedule(g).enabled).length, due: due.length });
       return response(200, { ok: true, due, telegramConnected });
