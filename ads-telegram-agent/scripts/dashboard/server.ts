@@ -1,11 +1,12 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import { sources, settings } from "../../agent/lib/config.ts";
+import { sources } from "../../agent/lib/config.ts";
 import { yesterday, validateDate } from "../../agent/lib/report.ts";
 import { prepareReport } from "../../agent/lib/job.ts";
 import { DeliveryError, telegramSend } from "../../agent/lib/delivery.ts";
 import { createPairing, saveSettings } from "./local-config.ts";
+import { dashboardState } from "../../agent/lib/dashboard-state.ts";
 
 const port = Number(process.env.DASHBOARD_PORT || 4317);
 const host = "127.0.0.1:" + port;
@@ -16,10 +17,7 @@ const assets = new Map([["/", ["index.html", "text/html"]], ["/style.css", ["sty
 const drafts = new Map<string, { text: string; until: number }>();
 const privateChat = () => Boolean(process.env.TELEGRAM_BOT_TOKEN && /^[1-9]\d*$/.test(process.env.TELEGRAM_CHAT_ID || ""));
 function status() {
-  return { defaultDate: yesterday(), deliveryTime: settings.deliveryTime, hasToken: !!process.env.TELEGRAM_BOT_TOKEN,
-    paired: privateChat(), localSendEnabled: process.env.SEND_REPORTS === "true",
-    months: Object.entries(sources()).sort(([a], [b]) => b.localeCompare(a)).map(([month, s]) =>
-      ({ month, url: `https://docs.google.com/spreadsheets/d/${s.spreadsheetId}/edit` })) };
+  return dashboardState();
 }
 
 const server = createServer(async (req, res) => {
@@ -37,7 +35,7 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url || "/", origin);
     const asset = assets.get(url.pathname);
     if (req.method === "GET" && asset) {
-      const file = await readFile(new URL(asset[0], import.meta.url));
+      const file = await readFile(new URL("../../public/" + asset[0], import.meta.url));
       res.writeHead(200, { "Content-Type": asset[1] + "; charset=utf-8" }).end(file);
       return;
     }

@@ -4,7 +4,7 @@ const nf = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 const longDate = new Intl.DateTimeFormat("vi-VN", { dateStyle: "full", timeZone: "UTC" });
 const shortTime = new Intl.DateTimeFormat("vi-VN", { timeStyle: "short", timeZone: "Asia/Ho_Chi_Minh" });
 const productCodes = { "Hàn Quốc": "KR", "Thượng Hải": "SH", "Đài Loan": "TW", "Khách Sạn": "KS" };
-let state, current, pairingCode, requestNumber = 0;
+let state, current, pairingCode, requestNumber = 0, access = false;
 const el = (name, text, cls) => {
   const node = document.createElement(name);
   if (text !== undefined) node.textContent = text;
@@ -24,24 +24,44 @@ async function api(path, body) {
   let response;
   try { response = await fetch("/api/" + path, options); }
   catch { throw new Error("Mất kết nối với bảng điều khiển. Mở lại trên máy rồi thử lại."); }
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.error || "Chưa hoàn tất thao tác.");
+  let result;
+  try { result = await response.json(); }
+  catch { throw new Error("Máy chủ chưa trả API báo cáo. Kiểm tra bản deploy và cấu hình Vercel."); }
+  if (!response.ok) {
+    if (result.code === "login" || result.code === "setup") showAccess(result);
+    throw new Error(result.error || "Chưa hoàn tất thao tác.");
+  }
   return result;
+}
+function showAccess(result) {
+  access = false; current = undefined;
+  $("accessView").hidden = false; $("logout").hidden = true;
+  $("accessTitle").textContent = result.code === "setup" ? "Thiết lập truy cập" : "Đăng nhập";
+  $("accessDescription").textContent = result.code === "setup" ? result.error : "Nhập mật khẩu quản trị để xem báo cáo quảng cáo.";
+  $("loginForm").hidden = result.code === "setup";
+  $("locationLabel").textContent = "Bản web";
+  route();
 }
 function feedback(id, text = "", error = false) {
   const node = $(id); node.textContent = text; node.classList.toggle("error", error);
 }
 function route() {
   const setup = location.hash === "#settings";
-  $("reportView").hidden = setup; $("settingsView").hidden = !setup;
+  $("reportView").hidden = !access || setup; $("settingsView").hidden = !access || !setup;
   (setup ? $("navReport") : $("navSettings")).removeAttribute("aria-current");
   (setup ? $("navSettings") : $("navReport")).setAttribute("aria-current", "page");
   document.title = (setup ? "Kết nối" : "Báo cáo quảng cáo") + " · Trạm Ads";
 }
 function updateState(data) {
   state = data;
+  access = true; $("accessView").hidden = true; $("fatal").hidden = true; route();
+  $("locationLabel").textContent = data.cloud ? "Bản web" : "Trên máy này";
+  $("logout").hidden = !data.cloud;
+  $("settingsEyebrow").textContent = data.cloud ? "CẤU HÌNH TRÊN VERCEL" : "CẤU HÌNH TRÊN MÁY";
+  $("pairForm").hidden = data.cloud; $("sourceEditor").hidden = data.cloud;
+  $("cloudTelegram").hidden = !data.cloud; $("cloudSources").hidden = !data.cloud;
   $("scheduleTime").textContent = data.deliveryTime;
-  $("scheduleStatus").textContent = data.localSendEnabled ? "Cần kiểm tra lịch trên cloud" : "Chưa bật gửi tự động";
+  $("scheduleStatus").textContent = data.localSendEnabled ? "Đã bật trong cấu hình" : "Chưa bật gửi tự động";
   const paired = data.paired;
   $("telegramState").textContent = paired ? "Đã cấu hình chat riêng" : "Chưa kết nối chat riêng";
   $("pairLink").textContent = paired ? "Quản lý kết nối" : "Kết nối Telegram";
@@ -54,6 +74,7 @@ function updateState(data) {
     const a = external("File tháng " + month + "/" + year, source.url);
     const arrow = el("span", "↗"); arrow.setAttribute("aria-hidden", "true"); a.append(arrow); li.append(a); return li;
   }));
+  if (!data.months.length) $("sourceList").append(el("li", "Chưa đăng ký file báo cáo."));
 }
 function summaryMetric(id, total, count) {
   const node = $(id); node.textContent = total.known ? nf.format(total.value) : "—";
@@ -114,8 +135,8 @@ $("preview").onclick = () => {
   if (!current) return;
   $("draft").textContent = current.text;
   $("dialogConnect").hidden = state.paired; $("send").hidden = !state.paired;
-  $("send").disabled = !!current.sent;
-  feedback("sendFeedback", current.sent ? "Đã gửi bản thử này vào Telegram." : "");
+  $("send").disabled = !!current.sent || !state.canSend;
+  feedback("sendFeedback", current.sent ? "Đã gửi bản thử này vào Telegram." : (state.paired && !state.canSend ? "Thêm cấu hình Redis trên Vercel để lưu lịch sử và gửi thử." : ""));
   $("dialog").showModal();
 };
 $("close").onclick = () => $("dialog").close();
@@ -158,12 +179,29 @@ $("sourceForm").onsubmit = async event => {
   finally { button.disabled = false; }
 };
 window.addEventListener("hashchange", route);
+$("loginForm").onsubmit = async event => {
+  event.preventDefault();
+  const button = $("loginForm").querySelector("button");
+  button.disabled = true; feedback("loginFeedback", "Đang đăng nhập…");
+  try {
+    await api("login", { password: $("password").value });
+    $("password").value = ""; feedback("loginFeedback"); await init();
+  } catch (error) { feedback("loginFeedback", error.message, true); }
+  finally { button.disabled = false; }
+};
+$("logout").onclick = async () => {
+  try {
+    await api("logout", {}); showAccess({ code: "login" }); $("password").focus();
+  } catch (error) { $("fatal").hidden = false; $("fatal").textContent = error.message; }
+};
 async function init() {
   route();
   try {
     updateState(await api("state"));
     $("date").value = new URLSearchParams(location.search).get("date") || state.defaultDate;
     await loadReport();
-  } catch (error) { $("fatal").hidden = false; $("fatal").textContent = error.message; }
+  } catch (error) {
+    if ($("accessView").hidden) { $("fatal").hidden = false; $("fatal").textContent = error.message; }
+  }
 }
 init();

@@ -18,6 +18,12 @@ rồi chạy `npm run ui`. Giữ cửa sổ Terminal mở và vào
 
 Bảng điều khiển lưu cấu hình vào `.env.local` trên máy. Để chạy lịch 09:00 độc lập với máy tính, thực hiện các bước 5 và 6 bên dưới rồi cập nhật cấu hình trên Vercel khi đổi bot hoặc thêm nguồn.
 
+Giao diện cũng được đóng gói trong `public/` để phục vụ tại đường dẫn gốc
+của bản deploy. API web được đăng ký qua channel `dashboard`. Trên Vercel,
+đặt `DASHBOARD_PASSWORD` gồm ít nhất 16 ký tự và đăng nhập trước khi xem dữ liệu.
+Các cấu hình Telegram và nguồn tháng trên web được cập nhật qua Environment Variables
+của project, rồi Redeploy. Gửi thử trên web cần Redis để lưu trạng thái giữa các lần gọi.
+
 ## Quy tắc đã chốt
 
 - Mỗi tháng dùng một file Google Sheets, đăng ký trong cấu hình riêng của môi trường chạy.
@@ -156,6 +162,11 @@ cáo. Chạy lại ngày đã gửi sẽ không gửi thêm. Nguồn:
 [Upstash Redis REST API](https://upstash.com/docs/redis/features/restapi).
 
 ## 6. Triển khai và bật lịch 09:00
+
+Nếu import từ GitHub, để Root Directory ở gốc repository hoặc chọn
+`ads-telegram-agent`. Cấu hình `vercel.json` tại cả hai vị trí đặt Framework
+Preset thành Other và build đúng thư mục. Giao diện tĩnh và API được đưa vào
+Vercel Build Output cùng với lịch gửi. [Vercel Build Output API](https://vercel.com/docs/build-output-api).
 
 Kiểm tra trước:
 

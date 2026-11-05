@@ -164,3 +164,10 @@ dialog pre { font: 14px/1.6 var(--body); background: var(--bg); padding: 16px; b
   .pill { font-size: 11px; } .panelHead p { font-size: 13px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
+
+.accessPanel { max-width: 520px; margin: 64px auto; }
+.accessPanel h1 { font-size: 36px; }
+.accessPanel p { margin-top: 12px; }
+#logout { margin-left: -24px; }
+#cloudTelegram, #cloudSources { overflow-wrap: anywhere; margin-top: 16px; }
+@media (max-width: 760px) { #logout { margin-left: 0; padding: 8px; } .accessPanel { margin: 32px auto; } }

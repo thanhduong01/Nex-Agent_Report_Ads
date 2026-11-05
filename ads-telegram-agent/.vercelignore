@@ -8,4 +8,6 @@ dist
 fixtures/
 outputs/
 tests/
-scripts/
+scripts/dashboard/
+scripts/report.ts
+scripts/telegram-chat.ts

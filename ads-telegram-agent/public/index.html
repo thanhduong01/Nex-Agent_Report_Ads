@@ -20,8 +20,11 @@
 <a class="skip" href="#main">Đến nội dung</a>
 <header class="mast"><div class="wrap top"><a class="brand" href="#report"><img src="/mark.svg" alt="" width="36" height="36">Trạm Ads</a>
 <nav aria-label="Điều hướng chính"><a href="#report" id="navReport" aria-current="page"><svg class="icon"><use href="#i-report"/></svg>Báo cáo</a><a href="#settings" id="navSettings"><svg class="icon"><use href="#i-link"/></svg>Kết nối</a></nav>
-<span class="local"><svg class="icon"><use href="#i-monitor"/></svg>Trên máy này</span></div></header>
+<span class="local" id="locationLabel"><svg class="icon"><use href="#i-monitor"/></svg>Trên máy này</span><button class="secondary" id="logout" hidden>Đăng xuất</button></div></header>
 <main id="main" tabindex="-1" class="wrap">
+<section id="accessView" class="panel setup accessPanel" aria-labelledby="accessTitle" hidden>
+<div class="eyebrow"><i></i>TRẠM ADS</div><h1 id="accessTitle">Đăng nhập</h1><p id="accessDescription">Nhập mật khẩu quản trị để xem báo cáo quảng cáo.</p>
+<form id="loginForm"><label for="password">Mật khẩu quản trị</label><input type="password" id="password" autocomplete="current-password" required><button class="primary">Đăng nhập</button></form><p id="loginFeedback" class="feedback" role="status"></p></section>
 <section id="reportView" aria-labelledby="reportTitle">
 <div class="headline"><div><div class="eyebrow"><i></i>BẢN TIN HẰNG NGÀY</div><h1 id="reportTitle">Báo cáo quảng cáo</h1><p id="dateDescription">Kết quả quảng cáo theo ngày báo cáo.</p></div>
 <div class="filters"><label for="date">Ngày báo cáo</label><div class="inline"><input type="date" id="date" required><button id="reload" class="iconBtn" aria-label="Tải lại báo cáo" title="Tải lại báo cáo"><svg class="icon"><use href="#i-refresh"/></svg></button></div></div></div>
@@ -44,13 +47,13 @@
 <button class="primary wide" id="preview" disabled>Xem trước bản tin<svg class="icon"><use href="#i-arrow"/></svg></button><a href="#settings" class="textLink" id="pairLink">Kết nối Telegram</a></section>
 </aside></div></section>
 <section id="settingsView" aria-labelledby="settingsTitle" hidden>
-<div class="headline"><div><div class="eyebrow"><i></i>CẤU HÌNH TRÊN MÁY</div><h1 id="settingsTitle">Kết nối</h1><p>Chọn cuộc trò chuyện nhận báo cáo và quản lý file từng tháng.</p></div></div>
+<div class="headline"><div><div class="eyebrow" id="settingsEyebrow"><i></i>CẤU HÌNH TRÊN MÁY</div><h1 id="settingsTitle">Kết nối</h1><p>Chọn cuộc trò chuyện nhận báo cáo và quản lý file từng tháng.</p></div></div>
 <div class="setupGrid"><section class="panel setup"><div class="sectionLine"><h2>Bot Telegram</h2><span class="pill" id="botBadge"></span></div>
 <p>Mở <a href="https://t.me/BotFather" target="_blank" rel="noreferrer">BotFather</a> và dùng lệnh <code>/newbot</code> để lấy token.</p>
-<form id="pairForm"><label for="token">Bot token</label><input id="token" type="password" autocomplete="off" spellcheck="false"><p class="hint" id="tokenHint">Token được lưu trên máy sau khi ghép nối.</p><button class="primary">Tạo liên kết ghép nối</button></form>
+<p class="hint" id="cloudTelegram" hidden>Trên Vercel, điền TELEGRAM_BOT_TOKEN và TELEGRAM_CHAT_ID trong Settings → Environment Variables, rồi Redeploy. Bạn có thể ghép nối bot trên bảng điều khiển local trước.</p><form id="pairForm"><label for="token">Bot token</label><input id="token" type="password" autocomplete="off" spellcheck="false"><p class="hint" id="tokenHint">Token được lưu trên máy sau khi ghép nối.</p><button class="primary">Tạo liên kết ghép nối</button></form>
 <div id="pairNext" hidden><p><a id="openBot" target="_blank" rel="noreferrer">Mở bot trong Telegram</a> và nhấn <b>Start</b>. Liên kết có hiệu lực 10 phút.</p><button class="secondary" id="confirm">Đã nhấn Start · Xác nhận</button></div><p class="feedback" id="pairFeedback" role="status"></p></section>
 <section class="panel setup"><div class="sectionLine"><h2>Nguồn Google Sheets</h2><svg class="icon mutedIcon"><use href="#i-sheet"/></svg></div>
-<ul id="sourceList"></ul><details><summary>Thêm file cho tháng mới</summary><form id="sourceForm"><label for="month">Tháng báo cáo</label><input type="month" id="month" required><label for="sheetUrl">Đường dẫn Google Sheets</label><input type="url" id="sheetUrl" required placeholder="https://docs.google.com/spreadsheets/…"><p class="hint">Dùng file có cùng các tab sản phẩm. Agent cần quyền đọc file.</p><button class="secondary">Lưu nguồn tháng</button></form></details><p class="feedback" id="sourceFeedback" role="status"></p></section></div>
+<ul id="sourceList"></ul><p class="hint" id="cloudSources" hidden>Thêm các tháng vào REPORT_SOURCES_JSON trong Vercel → Settings → Environment Variables, rồi Redeploy. Dùng cấu hình nguồn đã lưu trong .env.local trên máy.</p><details id="sourceEditor"><summary>Thêm file cho tháng mới</summary><form id="sourceForm"><label for="month">Tháng báo cáo</label><input type="month" id="month" required><label for="sheetUrl">Đường dẫn Google Sheets</label><input type="url" id="sheetUrl" required placeholder="https://docs.google.com/spreadsheets/…"><p class="hint">Dùng file có cùng các tab sản phẩm. Agent cần quyền đọc file.</p><button class="secondary">Lưu nguồn tháng</button></form></details><p class="feedback" id="sourceFeedback" role="status"></p></section></div>
 </section>
 <p id="fatal" role="alert" hidden></p>
 <footer><span>Trạm Ads</span><span>Google Sheets <span aria-hidden="true">→</span> Telegram</span></footer>
