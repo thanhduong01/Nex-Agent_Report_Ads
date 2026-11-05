@@ -14,15 +14,19 @@ export function productionOrigin() {
 async function telegramApi(method: string, payload: object = {}) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) throw new Error("Chưa cấu hình bot Telegram.");
+  let failure = "Không kết nối được Telegram. Kiểm tra bot token và thử lại.";
   try {
     const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       signal: AbortSignal.timeout(15000),
     });
-    const data = await response.json() as { ok: boolean; result: any };
-    if (!response.ok || !data.ok) throw new Error();
+    const data = await response.json() as { ok: boolean; result: any; error_code?: number };
+    if (!response.ok || !data.ok) {
+      failure = `Không kết nối được Telegram (${method}: HTTP ${response.status}, API ${Number(data.error_code) || response.status}). Kiểm tra bot token và cấu hình kết nối.`;
+      throw new Error();
+    }
     return data.result;
-  } catch { throw new Error("Không kết nối được Telegram. Kiểm tra bot token và thử lại."); }
+  } catch { throw new Error(failure); }
 }
 export async function telegramConnection() {
   const info = await telegramApi("getWebhookInfo");
