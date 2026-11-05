@@ -8,13 +8,14 @@ import { prepareReport } from "../../agent/lib/job.ts";
 import { DeliveryError, telegramSend } from "../../agent/lib/delivery.ts";
 import { createPairing } from "./local-config.ts";
 import { dashboardState } from "../../agent/lib/dashboard-state.ts";
+import { requestAction } from "../../agent/lib/request-actions.ts";
 
 const port = Number(process.env.DASHBOARD_PORT || 4317);
 const host = "127.0.0.1:" + port;
 const origin = "http://" + host;
 const pairing = createPairing();
 const assets = new Map([["/", ["index.html", "text/html"]], ["/style.css", ["style.css", "text/css"]],
-  ["/groups.js", ["groups.js", "text/javascript"]], ["/app.js", ["app.js", "text/javascript"]], ["/mark.svg", ["mark.svg", "image/svg+xml"]]]);
+  ["/requests.js", ["requests.js", "text/javascript"]], ["/groups.js", ["groups.js", "text/javascript"]], ["/app.js", ["app.js", "text/javascript"]], ["/mark.svg", ["mark.svg", "image/svg+xml"]]]);
 const drafts = new Map<string, { text: string; until: number }>();
 const privateChat = () => Boolean(process.env.TELEGRAM_BOT_TOKEN && /^[1-9]\d*$/.test(process.env.TELEGRAM_CHAT_ID || ""));
 function status() {
@@ -60,6 +61,7 @@ const server = createServer(async (req, res) => {
     }
     const data = JSON.parse(body) as Record<string, unknown>;
     const field = (name: string) => typeof data[name] === "string" ? data[name] : "";
+    if (["/api/request", "/api/request-preview"].includes(url.pathname)) return json(200, await requestAction(url.pathname, data));
     if (["/api/inspect", "/api/group"].includes(url.pathname)) return json(200, await groupAction(url.pathname, data));
     if (url.pathname === "/api/pair") return json(200, await pairing.start(field("token")));
     if (url.pathname === "/api/confirm") return json(200, await pairing.finish(field("code")));

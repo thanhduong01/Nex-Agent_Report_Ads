@@ -27,6 +27,7 @@
     "ai": "^7.0.137",
     "eve": "^1.0.0-rc.2",
     "google-auth-library": "^11.3.2",
+    "jose": "5.10.0",
     "read-excel-file": "^9.3.14",
     "zod": "^4.6.7"
   },

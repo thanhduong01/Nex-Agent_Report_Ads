@@ -7,9 +7,12 @@ import { prepareReport } from "./job.ts";
 import { deliveryKey, deliverOnce } from "./delivery.ts";
 import { validateDate, yesterday } from "./report.ts";
 import { connectTelegram, telegramConnection } from "./telegram-setup.ts";
+import { requestAction } from "./request-actions.ts";
+import { schedulerApi } from "./scheduler-api.ts";
 
 export async function dashboardApi(request: Request) {
   const url = new URL(request.url);
+  if (url.pathname === "/api/schedule-tick") return schedulerApi(request);
   const json = (status: number, body: unknown, extra: Record<string, string> = {}) =>
     Response.json(body, { status, headers: {
       "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...extra,
@@ -35,6 +38,7 @@ export async function dashboardApi(request: Request) {
       return json(200, { ok: true }, { "Set-Cookie": sessionCookie(request) });
     }
     if (!authenticated(request)) return json(401, { code: "login", error: "Đăng nhập để xem báo cáo." });
+    if (isPost && ["/api/request", "/api/request-preview"].includes(url.pathname)) return json(200, await requestAction(url.pathname, body));
     if (!isPost && url.pathname === "/api/telegram-status") return json(200, await telegramConnection());
     if (isPost && url.pathname === "/api/telegram-connect") {
       await connectTelegram(true);

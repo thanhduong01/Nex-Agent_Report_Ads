@@ -130,7 +130,7 @@ cửa sổ khác. Lỗi kho lưu trữ được báo trực tiếp. Local dùng 
 danh sách đã lưu. Khi danh sách đã tồn tại, chỉnh nguồn trên giao diện. File cũ
 vẫn dùng bộ đọc nhận diện tiêu đề để hỗ trợ cột dịch chuyển giữa tháng.
 
-Bộ kiểm tra lịch chạy mỗi phút, gửi các nhóm đến hạn theo giờ Việt Nam. Mỗi nhóm có giờ, ngày trong tuần và lựa chọn báo cáo hôm nay/hôm qua riêng. Lịch mới có hiệu lực sau khi lưu, không deploy lại. `SEND_REPORTS` chỉ còn dùng cho nhóm cũ chưa từng lưu lịch trong giao diện; nhóm có lịch riêng được điều khiển hoàn toàn trên web.
+GitHub Actions kiểm tra lịch mỗi 5 phút, gửi các nhóm đến hạn theo giờ Việt Nam. Mỗi nhóm có giờ, ngày trong tuần và lựa chọn báo cáo hôm nay/hôm qua riêng. Lịch mới có hiệu lực sau khi lưu, không deploy lại. `SEND_REPORTS` chỉ còn dùng cho nhóm cũ chưa từng lưu lịch trong giao diện; nhóm có lịch riêng được điều khiển hoàn toàn trên web.
 
 ## 5. Xem trước dữ liệu thật và kết nối lịch sử gửi
 
@@ -169,9 +169,9 @@ npm run build
 
 Liên kết project Vercel bằng `npx eve link`. Cấu hình `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `DASHBOARD_PASSWORD` và kết nối Blob riêng tư. Không đưa `.env.local` hoặc khóa JSON lên Git.
 
-Sau khi deploy, vào **Kết nối → Bot Telegram → Kết nối lệnh Telegram**. Bộ kiểm tra lịch cũng tự kết nối webhook khi chạy lần đầu trên production. Bot đã có webhook ở hệ thống khác sẽ được giữ nguyên và báo cần kiểm tra. Webhook xác thực bằng secret HMAC từ token bot (hoặc `TELEGRAM_WEBHOOK_SECRET_TOKEN` nếu bạn tự cấu hình); token không đưa xuống trình duyệt.
+Sau khi deploy, vào **Kết nối → Bot Telegram → Kết nối lệnh Telegram**. GitHub Actions cũng tự kết nối webhook khi kiểm tra lịch trên production. Bot đã có webhook ở hệ thống khác sẽ được giữ nguyên và báo cần kiểm tra. Webhook xác thực bằng secret HMAC từ token bot (hoặc `TELEGRAM_WEBHOOK_SECRET_TOKEN` nếu bạn tự cấu hình); token không đưa xuống trình duyệt.
 
-Lệnh trong chat riêng đã cấu hình:
+Các lệnh mặc định trong chat riêng đã cấu hình (có thể sửa trong **Yêu cầu bot**):
 
 - `/baocao`: số liệu hôm nay của tất cả nhóm có nguồn, kể cả nhóm đang tắt lịch.
 - `/baocao Thượng Hải`: hôm nay của một nhóm; có thể dùng mã nhóm từ `/nhom`.
@@ -180,9 +180,29 @@ Lệnh trong chat riêng đã cấu hình:
 
 Bot chỉ nhận lệnh từ đúng chat riêng và người gửi trùng `TELEGRAM_CHAT_ID`. Lệnh được xử lý trực tiếp, không cần AI Gateway. Mỗi tin nhắn mới đọc lại Sheets; cập nhật gửi lại cùng message ID không gửi lặp. Số liệu hôm nay mang nhãn đang cập nhật.
 
+## Cấu hình yêu cầu bot trên web
+
+Mở **Yêu cầu bot → Tạo yêu cầu**, điền tên và lệnh không dấu, ví dụ `thuonghai` để dùng `/thuonghai`. Bạn có thể thêm tối đa 5 câu tương đương như “báo cáo Thượng Hải”, mỗi câu một dòng. Bot khớp nguyên câu, bỏ qua hoa thường, dấu tiếng Việt và khoảng trắng dư; không suy đoán ý từ câu tự do.
+
+Chọn tất cả nhóm hoặc một số nhóm, ngày mặc định hôm nay/hôm qua, cho phép chọn ngày kèm lệnh và kiểu trả lời chi tiết/tổng quan. Tắt yêu cầu để bot ngừng nhận cả lệnh lẫn các câu tương đương. `/start`, `/help`, `/nhom`, `/lich`, `/report`, `/homnay` dành cho hệ thống. Các lệnh và câu không được trùng giữa các yêu cầu.
+
+**Chạy thử** dùng cấu hình đang chỉnh và đọc Sheets thật, chỉ hiện phản hồi trên web. Có thể thử `/thuonghai 02/11/2026` hoặc câu đã đặt. Chọn nhóm kèm lệnh chỉ được thu hẹp trong các nhóm của yêu cầu. **Lưu yêu cầu** có hiệu lực cho tin nhắn tiếp theo, không cần deploy. Để cập nhật ngay menu gợi ý Telegram, vào Kết nối và bấm **Kết nối & cập nhật menu lệnh**; GitHub Actions cũng cập nhật menu định kỳ.
+
+Nguồn cũ tự có hai yêu cầu `/baocao` (hôm nay), `/homqua` (hôm qua). Nhóm, nguồn, lịch và yêu cầu dùng chung bản cấu hình có kiểm soát phiên bản trong Blob riêng tư; thao tác lưu không ghi đè thay đổi từ cửa sổ khác. Tối đa 20 yêu cầu. Yêu cầu lấy báo cáo và lịch tự gửi độc lập: tắt một yêu cầu không tắt lịch của nhóm.
+
+## Chỉnh lịch tự động
+
 Đặt lịch trong **Kết nối → chọn nhóm → Lịch gửi tự động**. Chọn giờ Việt Nam, ngày trong tuần, hôm nay/hôm qua và bật/tắt; bấm **Lưu nhóm & lịch gửi**. Nút bật lịch trên web là công tắc của nhóm, không cần chỉnh biến môi trường nữa. Lịch cũ chưa bật gửi tự động vẫn tắt khi nâng cấp.
 
-Kiểm tra **Settings → Cron Jobs** có bộ kiểm tra `* * * * *`. Cần gói Vercel hỗ trợ cron mỗi phút (Pro/Enterprise); Hobby không hỗ trợ và deployment sẽ bị từ chối. Không tự nâng gói. Thời điểm thực tế còn phụ thuộc lịch chạy của nền tảng và thời gian đọc Sheets. Bộ kiểm tra bù các lần đến hạn trong vòng 2 giờ, chống gửi trùng bằng khóa nhóm/ngày/giờ/nơi nhận. Khi đổi lịch, không gửi bù giờ trước thời điểm bạn lưu.
+GitHub Actions chạy workflow `.github/workflows/report-scheduler.yml` mỗi 5 phút trên nhánh `main` (phút 2, 7, 12, … UTC). Vercel Free chỉ phục vụ web/API, không cần Vercel Cron. Mỗi lần workflow chạy, API đọc lịch mới nhất trong Blob; sửa lịch trên web không cần tạo commit hoặc deploy. Workflow kiểm tra từng nhóm và chỉ gửi khi đến hạn. Lịch nhận báo cáo và yêu cầu Telegram vẫn dùng cấu hình riêng.
+
+Kết nối GitHub → Vercel dùng OIDC ngắn hạn; API kiểm tra chữ ký GitHub, audience, repository/owner ID bất biến, nhánh `main`, đúng file workflow và loại sự kiện. Không cần PAT, token bot hay mật khẩu dashboard trong GitHub Secrets. API không trả nội dung báo cáo hoặc nguồn Sheets vào log công khai. Đổi repo/nhánh/domain phải cập nhật đồng thời workflow và `scheduler-auth.ts`.
+
+Trang Kết nối hiển thị heartbeat (ghi nhận mỗi 15 phút) và liên kết lần chạy trên GitHub. **Actions → Report scheduler → Run workflow → probe** kiểm tra kết nối, không gửi tin. Chọn **run** chỉ xử lý lịch đến hạn, không ép gửi ngay. Sau push thay đổi bộ lập lịch, workflow tự kiểm tra kết nối production.
+
+GitHub có thể chạy chậm hoặc bỏ lần chạy khi quá tải; lịch 5 phút không bảo đảm gửi đúng phút. Bộ kiểm tra bù các lần đến hạn trong vòng 2 giờ và chống gửi trùng bằng khóa nhóm/ngày/giờ/nơi nhận. Khi đổi lịch, không gửi bù giờ trước thời điểm lưu. Với repository public, GitHub có thể tự tắt scheduled workflow sau 60 ngày không có hoạt động repository; mở Actions để bật lại. Mọi lần gửi dùng lại lịch mới nhất, nên tắt lịch trước khi workflow xử lý sẽ ngăn gửi.
+
+Nguồn: [GitHub schedule limits](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule), [GitHub OIDC](https://docs.github.com/en/actions/reference/security/oidc).
 
 `eve dev` không tự chạy lịch. Chạy cloud để bot hoạt động khi máy tính tắt; bản local UI phục vụ cấu hình và xem trước, không đăng ký webhook hoặc tự gửi lịch.
 
@@ -198,7 +218,7 @@ chỉ số đã tính, không nhận các tab thưởng/sale. Phần nhận xét
 Nếu AI lỗi, báo cáo số liệu vẫn được gửi. Dùng AI có phát sinh usage theo model.
 
 Trong hội thoại Eve, tool `read_daily_report` cho phép hỏi dữ liệu theo ngày.
-Telegram hỗ trợ các lệnh báo cáo xác định phía trên; chưa có hội thoại AI tự do.
+Telegram hỗ trợ các lệnh và câu yêu cầu đã cấu hình; chưa có hội thoại AI tự do.
 Agent chỉ được cấp tool đọc báo cáo; các công cụ shell, sửa file, tìm web và
 ủy nhiệm mặc định của framework đã được tắt.
 
@@ -226,5 +246,9 @@ Agent chỉ được cấp tool đọc báo cáo; các công cụ shell, sửa f
 - `agent/lib/report.ts`: kiểm tra dữ liệu, tổng hợp, so sánh, dựng tin nhắn.
 - `agent/lib/sheets.ts`: quyền đọc và lấy dữ liệu Sheets.
 - `agent/lib/delivery.ts`: gửi Telegram, lịch sử gửi và chống trùng.
-- `agent/schedules/daily-report.ts`: lịch 09:00 Việt Nam.
+- `agent/lib/scheduler-api.ts` và `.github/workflows/report-scheduler.yml`: kiểm tra lịch trên web bằng GitHub Actions.
 - `.env.example`: danh sách biến cần điền, không chứa credentials.
+
+## Rollback triển khai
+
+Nếu cần quay lại bản trước, tắt workflow **Report scheduler** trên GitHub trước, sau đó promote deployment Vercel đã xác minh hoạt động. Không quay về commit có cron mỗi phút vì Vercel Hobby sẽ từ chối. Nguồn và lịch lưu trong Blob được giữ nguyên; kiểm tra đăng nhập, đọc báo cáo, `/api/schedule-tick` trả 401 khi thiếu token và trạng thái webhook trước khi bật workflow lại.

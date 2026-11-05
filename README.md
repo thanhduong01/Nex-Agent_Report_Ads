@@ -20,7 +20,7 @@ Mở [Trạm Ads](http://127.0.0.1:4317), vào **Kết nối** để đăng ký 
 
 ## Gửi tự động
 
-Lịch gửi dùng múi giờ `Asia/Ho_Chi_Minh`. Để chạy khi máy tính tắt, triển khai agent lên Vercel và cấu hình Telegram, nguồn Google Sheets cùng Vercel Blob riêng tư lưu cấu hình và lịch sử gửi. Trong Kết nối, chọn nhóm và cấu hình giờ, ngày trong tuần, hôm nay/hôm qua, rồi bật lịch. Bộ kiểm tra chạy mỗi phút, cần Vercel Pro/Enterprise.
+Lịch gửi dùng múi giờ `Asia/Ho_Chi_Minh`. Để chạy khi máy tính tắt, triển khai agent lên Vercel và cấu hình Telegram, nguồn Google Sheets cùng Vercel Blob riêng tư lưu cấu hình và lịch sử gửi. Trong Kết nối, chọn nhóm và cấu hình giờ, ngày trong tuần, hôm nay/hôm qua, rồi bật lịch. GitHub Actions kiểm tra mỗi 5 phút và tự áp dụng lịch vừa lưu trên web, dùng được với Vercel Free. Giờ gửi có thể trễ khi GitHub bận. Không cần PAT hay token Telegram trong GitHub Secrets.
 
 Hướng dẫn kết nối, quy tắc tính số liệu, kiểm tra và triển khai nằm trong [README của agent](ads-telegram-agent/README.md).
 
@@ -43,3 +43,7 @@ npm test
 npm run typecheck
 npm run build
 ```
+
+## Cấu hình lệnh và câu yêu cầu
+
+Vào **Yêu cầu bot** để tạo/sửa/xóa lệnh như `/thuonghai`, đặt câu như “báo cáo Thượng Hải”, chọn nhóm, ngày mặc định và kiểu phản hồi. Dùng **Chạy thử** để xem số liệu thật ngay trên web trước khi lưu. Câu được nhận diện nguyên câu, không phân biệt dấu tiếng Việt hoặc hoa thường. Mỗi lần lưu áp dụng ngay, không cần sửa biến môi trường. Lịch tự gửi được chỉnh riêng trong **Kết nối & lịch gửi**.

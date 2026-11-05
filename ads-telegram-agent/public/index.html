@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Trạm Ads · Báo cáo quảng cáo</title><link rel="icon" href="/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css"><script src="/groups.js" defer></script><script src="/app.js" defer></script></head>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Trạm Ads · Báo cáo quảng cáo</title><link rel="icon" href="/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css"><script src="/groups.js" defer></script><script src="/requests.js" defer></script><script src="/app.js" defer></script></head>
 <body>
 <svg xmlns="http://www.w3.org/2000/svg" class="definitions" aria-hidden="true"><defs>
 <symbol id="i-report" viewBox="0 0 24 24"><path d="M4 4v16h16M8 15v-4m5 4V6m5 9v-6"/></symbol>
@@ -19,7 +19,7 @@
 </defs></svg>
 <a class="skip" href="#main">Đến nội dung</a>
 <header class="mast"><div class="wrap top"><a class="brand" href="#report"><img src="/mark.svg" alt="" width="36" height="36">Trạm Ads</a>
-<nav aria-label="Điều hướng chính"><a href="#report" id="navReport" aria-current="page"><svg class="icon"><use href="#i-report"/></svg>Báo cáo</a><a href="#settings" id="navSettings"><svg class="icon"><use href="#i-link"/></svg>Kết nối</a></nav>
+<nav aria-label="Điều hướng chính"><a href="#report" id="navReport" aria-current="page"><svg class="icon"><use href="#i-report"/></svg>Báo cáo</a><a href="#requests" id="navRequests"><svg class="icon"><use href="#i-chat"/></svg>Yêu cầu bot</a><a href="#settings" id="navSettings"><svg class="icon"><use href="#i-link"/></svg>Kết nối &amp; lịch gửi</a></nav>
 <span class="local" id="locationLabel"><svg class="icon"><use href="#i-monitor"/></svg>Trên máy này</span><button class="secondary" id="logout" hidden>Đăng xuất</button></div></header>
 <main id="main" tabindex="-1" class="wrap">
 <section id="accessView" class="panel setup accessPanel" aria-labelledby="accessTitle" hidden>
@@ -47,20 +47,20 @@
 <button class="primary wide" id="preview" disabled>Xem trước bản tin<svg class="icon"><use href="#i-arrow"/></svg></button><a href="#settings" class="textLink" id="pairLink">Kết nối Telegram</a></section>
 </aside></div></section>
 <section id="settingsView" aria-labelledby="settingsTitle" hidden>
-<div class="headline"><div><div class="eyebrow" id="settingsEyebrow"><i></i>CẤU HÌNH TRÊN MÁY</div><h1 id="settingsTitle">Kết nối</h1><p>Chọn cuộc trò chuyện nhận báo cáo và quản lý file từng tháng.</p></div></div>
+<div class="headline"><div><div class="eyebrow" id="settingsEyebrow"><i></i>CẤU HÌNH TRÊN MÁY</div><h1 id="settingsTitle">Kết nối &amp; lịch gửi</h1><p>Chọn cuộc trò chuyện nhận báo cáo và quản lý file từng tháng.</p></div></div>
 <div class="setupGrid"><section class="panel setup"><div class="sectionLine"><h2>Bot Telegram</h2><span class="pill" id="botBadge"></span></div>
 <p>Mở <a href="https://t.me/BotFather" target="_blank" rel="noreferrer">BotFather</a> và dùng lệnh <code>/newbot</code> để lấy token.</p>
 <p class="hint" id="cloudTelegram" hidden>Trên Vercel, điền TELEGRAM_BOT_TOKEN và TELEGRAM_CHAT_ID trong Settings → Environment Variables, rồi Redeploy. Bạn có thể ghép nối bot trên bảng điều khiển local trước.</p><form id="pairForm"><label for="token">Bot token</label><input id="token" type="password" autocomplete="off" spellcheck="false"><p class="hint" id="tokenHint">Token được lưu trên máy sau khi ghép nối.</p><button class="primary">Tạo liên kết ghép nối</button></form>
 <div id="pairNext" hidden><p><a id="openBot" target="_blank" rel="noreferrer">Mở bot trong Telegram</a> và nhấn <b>Start</b>. Liên kết có hiệu lực 10 phút.</p><button class="secondary" id="confirm">Đã nhấn Start · Xác nhận</button></div><p class="feedback" id="pairFeedback" role="status"></p>
-<div id="commandsBox" hidden><h3>Lấy báo cáo trong Telegram</h3><p><code>/baocao</code> lấy số liệu hôm nay của tất cả nhóm.<br><code>/baocao 02/11/2026 Thượng Hải</code> chọn ngày và nhóm.<br><code>/homqua</code>, <code>/nhom</code>, <code>/lich</code> để xem thêm.</p><button id="connectCommands" class="secondary">Kết nối lệnh Telegram</button><p id="commandsFeedback" class="feedback" role="status"></p></div></section>
+<div id="commandsBox" hidden><h3>Lấy báo cáo trong Telegram</h3><p>Tạo lệnh và câu yêu cầu trong <a href="#requests">Yêu cầu bot</a>. Sau khi kết nối, nhắn <code>/help</code> để xem các yêu cầu đang bật, <code>/nhom</code> để xem nhóm hoặc <code>/lich</code> để xem lịch gửi.</p><button id="connectCommands" class="secondary">Kết nối &amp; cập nhật menu lệnh</button><p id="commandsFeedback" class="feedback" role="status"></p></div></section>
 <section class="panel setup groupManager"><div class="sectionLine"><h2>Nhóm báo cáo &amp; nguồn dữ liệu</h2><button id="newGroup" class="secondary">+ Tạo nhóm</button></div>
 <p class="hint" id="storageStatus">Mỗi nhóm có danh sách nguồn và cách đọc chỉ số riêng.</p>
 <label for="settingsGroup">Chọn nhóm</label><select id="settingsGroup"></select>
 <form id="groupForm"><label for="groupName">Tên nhóm báo cáo</label><input id="groupName" maxlength="80" required>
-<fieldset class="scheduleEditor"><legend>Lịch gửi tự động</legend><label class="checkLabel"><input id="groupEnabled" type="checkbox">Bật lịch cho nhóm này</label>
+<fieldset class="scheduleEditor"><legend>Lịch gửi tự động</legend><div class="schedulerHealth"><b>Chạy bằng GitHub Actions</b><p id="schedulerState" role="status">Đang kiểm tra kết nối lịch…</p><a id="schedulerRuns" target="_blank" rel="noreferrer">Xem lịch sử chạy ↗</a></div><label class="checkLabel"><input id="groupEnabled" type="checkbox">Bật lịch cho nhóm này</label>
 <div class="mappingGrid"><label>Giờ gửi · Việt Nam<input id="groupTime" type="time" value="09:00" required></label><label>Ngày lấy số liệu<select id="groupReportDay"><option value="yesterday">Hôm qua</option><option value="today">Hôm nay (đang cập nhật)</option></select></label></div>
 <fieldset class="weekdays"><legend>Ngày gửi trong tuần</legend><label><input type="checkbox" value="1" checked>T2</label><label><input type="checkbox" value="2" checked>T3</label><label><input type="checkbox" value="3" checked>T4</label><label><input type="checkbox" value="4" checked>T5</label><label><input type="checkbox" value="5" checked>T6</label><label><input type="checkbox" value="6" checked>T7</label><label><input type="checkbox" value="0" checked>CN</label></fieldset>
-<p id="nextRun" class="hint"></p><p class="hint">Lưu để áp dụng lịch mới. Bot chỉ gửi vào chat riêng đã kết nối. Bạn vẫn có thể gõ /baocao khi tắt lịch.</p></fieldset>
+<p id="nextRun" class="hint"></p><p class="hint">Lưu để GitHub Actions tự dùng lịch mới trong lần kiểm tra kế tiếp (mỗi 5 phút). Giờ gửi có thể trễ khi GitHub bận. Bạn vẫn có thể yêu cầu báo cáo trong Telegram khi tắt lịch.</p></fieldset>
 <button class="secondary">Lưu nhóm &amp; lịch gửi</button></form><p id="groupFeedback" class="feedback" role="status"></p>
 <ul id="sourceList"></ul>
 <details id="sourceEditor"><summary id="sourceSummary">Thêm file báo cáo</summary>
@@ -71,6 +71,30 @@
 <div id="mappingList"></div><button class="primary" id="saveSource" disabled>Kiểm tra &amp; lưu nguồn</button>
 </form></details><p class="feedback" id="sourceFeedback" role="status"></p></section></div>
 </section>
+<section id="requestsView" aria-labelledby="requestsTitle" hidden>
+<div class="headline"><div><div class="eyebrow"><i></i>BẠN NHẮN · BOT LẤY BÁO CÁO</div><h1 id="requestsTitle">Yêu cầu bot</h1><p>Đặt lệnh và câu yêu cầu, chọn số liệu bot sẽ trả về.</p></div><a href="#settings" class="secondary requestScheduleLink"><svg class="icon"><use href="#i-clock"/></svg>Cài lịch gửi tự động</a></div>
+<div class="requestWorkspace">
+<aside class="requestLibrary" aria-label="Yêu cầu đã lưu"><div class="sectionLine"><h2>Đã cấu hình</h2><span id="requestCount" class="pill">0</span></div><div id="requestList"></div><button id="newRequest" class="secondary wide">+ Tạo yêu cầu</button><p class="hint">Bot chỉ nhận yêu cầu từ chat riêng đã kết nối.</p></aside>
+<section class="panel requestEditor" aria-labelledby="requestEditorTitle">
+<div class="sectionLine"><h2 id="requestEditorTitle">Chỉnh yêu cầu</h2><span id="requestSaveState" class="pill">Đã lưu</span></div>
+<form id="requestForm">
+<fieldset id="requestFields">
+<label for="reqName">Tên yêu cầu</label><input id="reqName" maxlength="80" required placeholder="Báo cáo Thượng Hải">
+<label for="reqCommand">Lệnh Telegram</label><div class="commandInput"><span aria-hidden="true">/</span><input id="reqCommand" pattern="[a-z][a-z0-9_]{0,31}" maxlength="32" required placeholder="thuonghai" spellcheck="false" autocapitalize="off" aria-describedby="commandHint"></div><p class="hint" id="commandHint">Chữ thường không dấu, số và dấu gạch dưới. Không nhập dấu /.</p>
+<label for="reqPhrases">Hoặc nhắn một trong các câu</label><textarea id="reqPhrases" rows="3" maxlength="604" placeholder="báo cáo Thượng Hải&#10;xem số liệu Thượng Hải" aria-describedby="phraseHint"></textarea><p class="hint" id="phraseHint">Mỗi dòng một câu, tối đa 5 câu. Khớp nguyên câu; không phân biệt hoa thường hoặc dấu tiếng Việt.</p>
+<div class="requestDivider"></div><h3>Bot lấy dữ liệu nào?</h3>
+<label for="reqGroupMode">Nhóm báo cáo</label><select id="reqGroupMode"><option value="all">Tất cả nhóm có nguồn dữ liệu</option><option value="selected">Chọn nhóm cụ thể</option></select>
+<fieldset id="reqGroupChoices" hidden><legend>Chọn ít nhất một nhóm</legend><div id="reqGroups"></div></fieldset>
+<div class="requestPair"><div><label for="reqReportDay">Ngày mặc định</label><select id="reqReportDay"><option value="today">Hôm nay</option><option value="yesterday">Hôm qua</option></select></div><div><label for="reqFormat">Nội dung phản hồi</label><select id="reqFormat"><option value="detailed">Chi tiết từng sản phẩm</option><option value="summary">Chỉ tổng quan</option></select></div></div>
+<label class="checkLabel"><input id="reqAllowDate" type="checkbox" checked>Cho phép chọn ngày kèm lệnh</label><p class="hint" id="reqExample">Ví dụ: /baocao 02/11/2026</p>
+<div class="requestDivider"></div><label class="checkLabel requestEnable"><input id="reqEnabled" type="checkbox" checked>Bật yêu cầu này trong Telegram</label>
+</fieldset>
+<div class="requestActions"><button id="saveRequest" class="primary">Lưu yêu cầu</button><button id="deleteRequest" type="button" class="quietDanger">Xóa yêu cầu</button></div><p id="requestFeedback" class="feedback" role="status"></p>
+</form></section>
+<aside class="requestPreview" aria-labelledby="requestPreviewTitle"><div class="sectionLine"><h2 id="requestPreviewTitle">Chạy thử</h2><span class="pill">Trên web</span></div><p class="hint">Đọc số liệu thật từ Google Sheets. Chưa gửi tin nhắn đến Telegram.</p>
+<form id="requestTestForm"><label for="reqTestMessage">Tin nhắn gửi bot</label><input id="reqTestMessage" maxlength="250" required autocomplete="off" spellcheck="false"><button id="testRequest" class="secondary wide">Chạy thử yêu cầu<svg class="icon"><use href="#i-arrow"/></svg></button></form>
+<div class="telegramPreview"><div class="previewBot"><span class="roundIcon"><svg class="icon"><use href="#i-plane"/></svg></span><div><b>Bot báo cáo của bạn</b><small>Bản xem thử</small></div></div><div id="requestConversation" aria-live="polite"><p class="previewEmpty">Nhập lệnh hoặc câu yêu cầu phía trên để xem bot sẽ trả lời thế nào.</p></div></div><p id="requestTestFeedback" class="feedback" role="status"></p>
+</aside></div></section>
 <p id="fatal" role="alert" hidden></p>
 <footer><span>Trạm Ads</span><span>Google Sheets <span aria-hidden="true">→</span> Telegram</span></footer>
 </main>

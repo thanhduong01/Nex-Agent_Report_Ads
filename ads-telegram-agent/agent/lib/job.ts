@@ -27,10 +27,11 @@ export async function prepareReport(date: string, groupId = "default") {
   return { report, text };
 }
 
-export async function scheduledReport(now = new Date()) {
+export async function scheduledReport(now = new Date(), groupId?: string) {
   const registry = await getRegistry();
   const results = [];
   for (const group of registry.groups) {
+    if (groupId && group.id !== groupId) continue;
     const occurrence = dueOccurrence(effectiveSchedule(group), now);
     if (!occurrence) continue;
     const date = occurrence.reportDate;

@@ -5,6 +5,7 @@
   --body: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
   --numbers: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 }
+textarea { font: inherit; color: var(--ink); background: var(--paper); border: 1px solid #bdcbdb; border-radius: 9px; padding: 10px 12px; width: 100%; resize: vertical; }
 * { box-sizing: border-box; }
 html { min-height: 100%; }
 body { margin: 0; color: var(--ink); background: var(--bg); font: 16px/1.5 var(--body); }
@@ -192,3 +193,71 @@ select { font: inherit; color: var(--ink); background: var(--paper); border: 1px
 .mappingHint { margin-top: 12px; }
 @media (max-width: 760px) { .setupGrid { grid-template-columns: 1fr; } .reportFilters { width: 100%; gap: 12px; } .reportFilters>div:first-child { width: 100%; } .reportFilters select { max-width: 100%; width: 100%; } .sourceActions { flex-wrap: wrap; } }
 .scheduleEditor{border:1px solid var(--line,#dce2eb);border-radius:12px;padding:16px;margin:18px 0}.scheduleEditor legend{font-weight:600;padding:0 6px}.weekdays{display:flex;flex-wrap:wrap;gap:12px;border:0;padding:12px 0;margin:0}.weekdays legend{font-size:13px;padding:8px 0}.weekdays label{display:flex;align-items:center;gap:5px;margin:0}.weekdays input{width:auto;margin:0}.timeLine span{max-width:145px;line-height:1.5}#commandsBox{margin-top:24px;border-top:1px solid var(--line,#dce2eb);padding-top:18px}#commandsBox p{line-height:1.8;overflow-wrap:anywhere}
+
+/* Bot requests: saved commands, editor, and an actual reply preview. */
+.requestWorkspace { display: grid; grid-template-columns: minmax(190px,.8fr) minmax(340px,1.6fr) minmax(280px,1.15fr); gap: 22px; align-items: start; }
+.schedulerHealth { padding: 12px; background: var(--bg); border-radius: 9px; margin-bottom: 12px; font-size: 13px; }
+.schedulerHealth p { font-size: 12px; margin: 4px 0 8px; }
+.requestWorkspace > * { min-width: 0; }
+.requestWorkspace .hint { font-size: 12px; line-height: 1.6; }
+.requestLibrary, .requestPreview { display: block; }
+.requestLibrary .sectionLine, .requestPreview .sectionLine { margin-bottom: 14px; }
+.requestLibrary h2, .requestPreview h2 { font-size: 18px; }
+.requestCard { width: 100%; display: block; text-align: left; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 15px 13px; margin-bottom: 10px; }
+.requestCard[aria-pressed=true] { border-color: var(--blue); box-shadow: inset 3px 0 var(--blue); background: #edf2ff; }
+.requestCardTop { display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
+.requestCard code { color: var(--blue); font: 650 14px var(--numbers); overflow-wrap: anywhere; }
+.requestCard .pill { font-size: 10px; padding: 3px 7px; }
+.requestCard strong, .requestCard small { display: block; overflow-wrap: anywhere; }
+.requestCard strong { font-size: 14px; margin-top: 10px; }
+.requestCard small { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.requestLibrary > .hint { margin-top: 14px; }
+.requestLibrary .wide { justify-content: center; }
+.requestEditor { padding: 24px; }
+.requestEditor h2 { font-size: 21px; }
+#requestFields { border: 0; margin: 0; padding: 0; min-width: 0; }
+.requestEditor select { width: 100%; font-size: 14px; }
+.requestEditor input:not([type=checkbox]) { width: 100%; }
+.commandInput { display: flex; align-items: center; gap: 6px; background: #edf2ff; border: 1px solid #b8cbf2; border-radius: 10px; padding-left: 13px; margin-bottom: 8px; color: var(--blue); font: 600 25px var(--numbers); }
+.commandInput input { background: transparent; border: none; border-radius: 0; font: 600 22px var(--numbers); letter-spacing: -.03em; padding-left: 0; margin: 0; color: var(--blue); min-width: 0; }
+.requestDivider { border-top: 1px solid var(--line); margin: 20px 0; }
+.requestPair { display: grid; grid-template-columns: minmax(0,.85fr) minmax(0,1.15fr); gap: 12px; margin: 16px 0 8px; }
+.requestEditor .requestPair label { margin-top: 0; }
+#reqGroupChoices { border: 1px solid var(--line); padding: 8px 12px; margin: 14px 0; border-radius: 9px; }
+#reqGroupChoices legend { font-size: 12px; color: var(--muted); }
+#reqGroups label { margin: 0; overflow-wrap: anywhere; }
+#reqGroups input { flex: 0 0 18px; }
+.requestEnable { color: var(--teal); }
+.requestActions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 15px; }
+.quietDanger { background: transparent; border: 0; color: #8a3129; padding: 10px 0; min-height: 44px; font-size: 13px; cursor: pointer; }
+.requestScheduleLink { display: inline-flex; gap: 8px; align-items: center; text-decoration: none; }
+.requestPreview { position: sticky; top: 24px; }
+#requestTestForm { margin: 16px 0; }
+#requestTestForm .wide { margin-top: 4px; }
+.telegramPreview { background: #e6edf7; border: 1px solid #c8d5e6; border-radius: 14px; overflow: hidden; }
+.previewBot { display: flex; gap: 9px; align-items: center; padding: 13px 15px; background: var(--paper); border-bottom: 1px solid var(--line); }
+.previewBot b { font-size: 13px; }
+.previewBot small { display: block; color: var(--muted); font-size: 11px; }
+#requestConversation { padding: 16px 12px; min-height: 210px; max-height: 560px; overflow: auto; }
+.previewEmpty { padding: 35px 12px; text-align: center; color: var(--muted); font-size: 13px; }
+.chatUser, .chatBot { font: 13px/1.65 var(--body); overflow-wrap: anywhere; white-space: pre-wrap; padding: 10px 12px; border-radius: 11px; margin: 0 0 12px; }
+.chatUser { background: var(--blue); color: white; margin-left: 28px; border-bottom-right-radius: 3px; }
+.chatBot { background: var(--paper); border: 1px solid var(--line); border-bottom-left-radius: 3px; }
+@media (max-width: 1100px) {
+ .requestWorkspace { grid-template-columns: minmax(170px,.7fr) minmax(320px,1.4fr); gap: 18px; }
+ .requestPreview { grid-column: 2; position: static; }
+ .requestLibrary { grid-row: 1 / 3; }
+ .top { gap: 24px; } nav { gap: 15px; }
+}
+@media (max-width: 760px) {
+ .requestWorkspace { grid-template-columns: minmax(0,1fr); gap: 24px; }
+ .requestPreview { grid-column: auto; } .requestLibrary { grid-row: auto; }
+ #requestList { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+ .requestCard { margin: 0; } .requestLibrary > button { margin-top: 12px; }
+ .requestEditor { padding: 20px; } .requestPair { grid-template-columns: 1fr; }
+ .top { flex-wrap: wrap; gap: 0; padding-top: 12px; }
+ .brand { margin-bottom: 8px; } .top #logout { margin-left: auto; margin-bottom: 8px; }
+ nav { order: 3; margin: 0; width: 100%; min-height: 48px; justify-content: space-between; gap: 8px; }
+ nav a { padding: 4px 0; font-size: 13px; }
+ .requestScheduleLink { width: 100%; justify-content: center; }
+}

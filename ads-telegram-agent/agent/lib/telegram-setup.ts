@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { getRegistry } from "./groups.ts";
 
 export function webhookSecret() {
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -39,9 +40,9 @@ export async function connectTelegram(force = false) {
   if (info.url && info.url !== url) throw new Error("Bot đang kết nối hệ thống khác. Kiểm tra webhook đang dùng trước khi chuyển sang Trạm Ads.");
   // Do not discard pending messages. The inbound handler ignores stale setup messages.
   await telegramApi("setWebhook", { url, secret_token: webhookSecret(), allowed_updates: ["message"], max_connections: 2 });
+  const registry = await getRegistry();
   await telegramApi("setMyCommands", { commands: [
-    { command: "baocao", description: "Báo cáo hôm nay; có thể thêm ngày và tên nhóm" },
-    { command: "homqua", description: "Báo cáo ngày hôm qua" },
+    ...registry.requests.filter(r => r.enabled).map(r => ({ command: r.command, description: r.name })),
     { command: "nhom", description: "Danh sách nhóm báo cáo" },
     { command: "lich", description: "Xem lịch gửi và mở trang cấu hình" },
     { command: "help", description: "Hướng dẫn sử dụng" },

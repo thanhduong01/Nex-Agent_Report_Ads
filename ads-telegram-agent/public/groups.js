@@ -13,6 +13,10 @@ function setupGroups(data) {
     : "Kết nối kho Vercel Blob riêng tư để lưu nhóm báo cáo trên web.";
   document.getElementById("newGroup").disabled = !data.canEditGroups;
   document.getElementById("sourceEditor").hidden = !data.canEditGroups;
+  $("schedulerState").textContent = !data.cloud ? "Bản trên máy chỉ dùng cấu hình và xem thử. Lịch tự động dùng cấu hình đã lưu trên website."
+    : data.scheduler?.checkedAt ? (data.scheduler.healthy ? "Đã kết nối" : "Chưa nhận lần kiểm tra mới") + " · Ghi nhận lúc " + new Date(data.scheduler.checkedAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })
+    : "Chưa ghi nhận lần kiểm tra. Xem trạng thái workflow trên GitHub.";
+  $("schedulerRuns").href = data.scheduler?.runUrl || data.scheduler?.workflowUrl || "https://github.com/thanhduong01/Nex-Agent_Report_Ads/actions";
   fillGroup(); updateGroupSchedule();
 }
 function updateGroupSchedule() {
@@ -20,7 +24,8 @@ function updateGroupSchedule() {
   const schedule = group?.schedule;
   $("scheduleTime").textContent = schedule?.time || "09:00";
   $("scheduleDays").textContent = (schedule?.days.length === 7 ? "Hằng ngày" : (schedule?.days || []).map(d => ["CN", "T2", "T3", "T4", "T5", "T6", "T7"][d]).join(", ")) + " · giờ Việt Nam";
-  $("scheduleStatus").textContent = !schedule?.enabled ? "Nhóm này đang tạm dừng" : (state.canSend ? "Đã bật lịch gửi" : "Cần hoàn tất kết nối Telegram");
+  $("scheduleStatus").textContent = !schedule?.enabled ? "Nhóm này đang tạm dừng" : !state.canSend ? "Cần hoàn tất kết nối Telegram"
+    : state.scheduler?.healthy ? "Đã bật · GitHub Actions" : "Đã lưu lịch · Kiểm tra GitHub";
   $("scheduleDetail").textContent = "Báo cáo " + (schedule?.reportDay === "today" ? "hôm nay · đang cập nhật." : "ngày hôm trước.");
 }
 function fillGroup() {

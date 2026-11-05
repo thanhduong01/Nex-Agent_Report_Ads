@@ -22,11 +22,14 @@ test(`hosted dashboard protects data and sessions with a ${passwordBytes * 2}-ch
   process.env.DASHBOARD_PASSWORD = password;
   assert.equal((await dashboardApi(request("/api/state"))).status, 401);
   assert.equal((await dashboardApi(request("/api/report?date=2026-11-02"))).status, 401);
+  assert.equal((await dashboardApi(request("/api/request", {}))).status, 401);
+  assert.equal((await dashboardApi(request("/api/request-preview", {}))).status, 401);
   assert.equal((await dashboardApi(request("/api/login", { password: "wrong" }))).status, 401);
   assert.equal((await dashboardApi(request("/api/login", { password }, undefined, "https://other.example"))).status, 403);
   const login = await dashboardApi(request("/api/login", { password }));
   assert.equal(login.status, 200);
   const cookie = login.headers.get("set-cookie")!;
+  assert.equal((await dashboardApi(request("/api/request", {}, cookie, "https://other.example"))).status, 403);
   assert.match(cookie, /HttpOnly/); assert.match(cookie, /Secure/); assert.match(cookie, /SameSite=Strict/);
   const state = await dashboardApi(request("/api/state", undefined, cookie));
   assert.equal(state.status, 200);

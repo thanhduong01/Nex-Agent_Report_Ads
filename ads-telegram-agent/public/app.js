@@ -46,11 +46,12 @@ function feedback(id, text = "", error = false) {
   const node = $(id); node.textContent = text; node.classList.toggle("error", error);
 }
 function route() {
-  const setup = location.hash === "#settings";
-  $("reportView").hidden = !access || setup; $("settingsView").hidden = !access || !setup;
-  (setup ? $("navReport") : $("navSettings")).removeAttribute("aria-current");
-  (setup ? $("navSettings") : $("navReport")).setAttribute("aria-current", "page");
-  document.title = (setup ? "Kết nối" : "Báo cáo quảng cáo") + " · Trạm Ads";
+  const selected = ["#settings", "#requests"].includes(location.hash) ? location.hash.slice(1) : "report";
+  for (const [view, nav] of [["report", "navReport"], ["settings", "navSettings"], ["requests", "navRequests"]]) {
+    $(view + "View").hidden = !access || view !== selected;
+    if (view === selected) $(nav).setAttribute("aria-current", "page"); else $(nav).removeAttribute("aria-current");
+  }
+  document.title = ({ settings: "Kết nối & lịch gửi", requests: "Yêu cầu bot", report: "Báo cáo quảng cáo" })[selected] + " · Trạm Ads";
 }
 function updateState(data) {
   state = data;
@@ -72,6 +73,7 @@ function updateState(data) {
   $("token").required = !data.hasToken;
   $("tokenHint").textContent = data.hasToken ? "Để trống để dùng token đã lưu, hoặc nhập token của bot mới." : "Token được lưu trên máy sau khi ghép nối.";
   setupGroups(data);
+  setupRequests(data);
 }
 function summaryMetric(id, total, count) {
   const node = $(id); node.textContent = total.known ? nf.format(total.value) : "—";
@@ -198,7 +200,7 @@ $("connectCommands").onclick = async () => {
   feedback("commandsFeedback", "Đang kết nối lệnh với Telegram…");
   try {
     const result = await api("telegram-connect", {});
-    feedback("commandsFeedback", result.connected ? "Đã kết nối. Mở Telegram và gõ /baocao để nhận báo cáo hôm nay." : "Chưa xác nhận kết nối. Thử lại sau.", !result.connected);
+    feedback("commandsFeedback", result.connected ? "Đã kết nối và cập nhật menu. Mở Telegram, nhắn /help để xem các yêu cầu đang bật." : "Chưa xác nhận kết nối. Thử lại sau.", !result.connected);
   } catch (error) { feedback("commandsFeedback", error.message, true); }
   finally { button.disabled = false; }
 };

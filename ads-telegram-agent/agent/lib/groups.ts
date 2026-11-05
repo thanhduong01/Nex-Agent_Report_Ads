@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { resolve, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { scheduleSchema } from "./schedule-config.ts";
+import { defaultRequests, requestSchema } from "./request-config.ts";
 
 export const monthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
 export const groupSchema = z.object({
@@ -15,14 +16,15 @@ export const groupSchema = z.object({
   sources: z.record(monthSchema, sourceSchema),
 });
 export type ReportGroup = z.infer<typeof groupSchema>;
-const registrySchema = z.object({ version: z.literal(1), revision: z.number().int().nonnegative(), groups: z.array(groupSchema).max(30) });
+const registrySchema = z.object({ version: z.literal(1), revision: z.number().int().nonnegative(), groups: z.array(groupSchema).max(30),
+  requests: z.array(requestSchema).max(20).default(defaultRequests) });
 export type Registry = z.infer<typeof registrySchema>;
 const blobPath = () => `report-config/${process.env.VERCEL_ENV || "production"}/groups.json`;
 const localPath = () => process.env.REPORT_CONFIG_PATH || resolve(process.cwd(), ".data/report-groups.json");
 export const hasGroupStorage = () => !!(process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID);
 const cloud = () => process.env.VERCEL === "1";
 function initial(): Registry {
-  return { version: 1, revision: 0, groups: [{ id: "default", name: "Báo cáo hiện tại", enabled: true, sources: sources() }] };
+  return { version: 1, revision: 0, groups: [{ id: "default", name: "Báo cáo hiện tại", enabled: true, sources: sources() }], requests: defaultRequests() };
 }
 export class GroupError extends Error {
   status: number;
@@ -50,12 +52,17 @@ export async function saveGroup(input: unknown, revision: number) {
   const parsed = groupSchema.safeParse(input);
   if (!parsed.success) throw new GroupError("Kiểm tra tên nhóm, tháng, đường dẫn và các cột dữ liệu.");
   const group = parsed.data;
+  return updateRegistry(revision, registry => {
+    if (registry.groups.some(g => g.id !== group.id && g.name.toLocaleLowerCase("vi") === group.name.toLocaleLowerCase("vi")))
+      throw new GroupError("Tên nhóm này đã được sử dụng.");
+    const existing = registry.groups.findIndex(g => g.id === group.id);
+    if (existing < 0) registry.groups.push(group); else registry.groups[existing] = group;
+  });
+}
+export async function updateRegistry(revision: number, change: (registry: Registry) => void) {
   const { registry, etag } = await readStored();
   if (registry.revision !== revision) throw new GroupError("Cấu hình đã thay đổi ở một cửa sổ khác. Tải lại danh sách rồi lưu lại.", 409);
-  if (registry.groups.some(g => g.id !== group.id && g.name.toLocaleLowerCase("vi") === group.name.toLocaleLowerCase("vi")))
-    throw new GroupError("Tên nhóm này đã được sử dụng.");
-  const existing = registry.groups.findIndex(g => g.id === group.id);
-  if (existing < 0) registry.groups.push(group); else registry.groups[existing] = group;
+  change(registry);
   registry.revision++;
   registrySchema.parse(registry);
   const content = JSON.stringify(registry);
