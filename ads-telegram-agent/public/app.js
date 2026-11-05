@@ -66,10 +66,10 @@ function updateState(data) {
   $("scheduleTime").textContent = data.deliveryTime;
   $("scheduleStatus").textContent = data.localSendEnabled ? "Đã bật trong cấu hình" : "Chưa bật gửi tự động";
   const paired = data.paired;
-  $("telegramState").textContent = paired ? "Đã cấu hình chat riêng" : "Chưa kết nối chat riêng";
+  $("telegramState").textContent = data.scheduler?.telegramConnected === false ? "Kết nối Telegram cần kiểm tra" : paired ? "Đã cấu hình chat riêng" : "Chưa kết nối chat riêng";
   $("pairLink").textContent = paired ? "Quản lý kết nối" : "Kết nối Telegram";
-  $("botBadge").textContent = paired ? "Đã cấu hình" : "Chưa ghép nối";
-  $("botBadge").className = "pill " + (paired ? "good" : "warn");
+  $("botBadge").textContent = data.scheduler?.telegramConnected === false ? "Cần kiểm tra kết nối" : paired ? "Đã cấu hình" : "Chưa ghép nối";
+  $("botBadge").className = "pill " + (paired && data.scheduler?.telegramConnected !== false ? "good" : "warn");
   $("token").required = !data.hasToken;
   $("tokenHint").textContent = data.hasToken ? "Để trống để dùng token đã lưu, hoặc nhập token của bot mới." : "Token được lưu trên máy sau khi ghép nối.";
   setupGroups(data);

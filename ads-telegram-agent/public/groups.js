@@ -24,7 +24,7 @@ function updateGroupSchedule() {
   const schedule = group?.schedule;
   $("scheduleTime").textContent = schedule?.time || "09:00";
   $("scheduleDays").textContent = (schedule?.days.length === 7 ? "Hằng ngày" : (schedule?.days || []).map(d => ["CN", "T2", "T3", "T4", "T5", "T6", "T7"][d]).join(", ")) + " · giờ Việt Nam";
-  $("scheduleStatus").textContent = !schedule?.enabled ? "Nhóm này đang tạm dừng" : !state.canSend ? "Cần hoàn tất kết nối Telegram"
+  $("scheduleStatus").textContent = !schedule?.enabled ? "Nhóm này đang tạm dừng" : !state.canSend || state.scheduler?.telegramConnected === false ? "Cần kiểm tra kết nối Telegram"
     : state.scheduler?.healthy ? "Đã bật · GitHub Actions" : "Đã lưu lịch · Kiểm tra GitHub";
   $("scheduleDetail").textContent = "Báo cáo " + (schedule?.reportDay === "today" ? "hôm nay · đang cập nhật." : "ngày hôm trước.");
 }

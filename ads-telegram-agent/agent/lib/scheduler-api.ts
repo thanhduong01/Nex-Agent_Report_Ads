@@ -38,7 +38,7 @@ export async function schedulerApi(request: Request, deps = defaults) {
           ? message : "Kiểm tra kết nối trong bảng điều khiển.");
       }
       await deps.record({ checkedAt: now.toISOString(), runId: identity.runId,
-        enabled: registry.groups.filter(g => effectiveSchedule(g).enabled).length, due: due.length });
+        enabled: registry.groups.filter(g => effectiveSchedule(g).enabled).length, due: due.length, telegramConnected });
       return response(200, { ok: true, due, telegramConnected });
     }
     if (typeof body.groupId !== "string" || !/^[a-z0-9-]{1,64}$/.test(body.groupId)) return response(400, { error: "Invalid group" });
