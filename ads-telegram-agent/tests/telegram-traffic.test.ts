@@ -1,8 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { telegramRejection, receiveTelegramCommand } from "../agent/lib/telegram-commands.ts";
+import { privateChatIdReply, telegramRejection, receiveTelegramCommand } from "../agent/lib/telegram-commands.ts";
 import { readTelegramTraffic } from "../agent/lib/telegram-traffic.ts";
 import { telegramConnection, connectTelegram } from "../agent/lib/telegram-setup.ts";
+
+test("chatid setup replies only with the private caller's own ID and never changes report authorization", () => {
+  const message = { messageId: "1", text: "/chatid@ExampleBot", chat: { id: "999", type: "private" }, from: { id: "999", isBot: false } };
+  assert.match(privateChatIdReply(message)!, /TELEGRAM_CHAT_ID=999/);
+  assert.equal(privateChatIdReply({ ...message, text: "/help" }), null);
+  assert.equal(privateChatIdReply({ ...message, chat: { id: "999", type: "group" } }), null);
+  assert.equal(privateChatIdReply({ ...message, from: { id: "other", isBot: false } }), null);
+  assert.equal(privateChatIdReply({ ...message, from: { id: "999", isBot: true } }), null);
+});
 
 test("rejected commands are visible to the operator without storing a message or personal IDs", async t => {
   const keys = ["TELEGRAM_CHAT_ID", "VERCEL", "BLOB_READ_WRITE_TOKEN", "BLOB_STORE_ID"];

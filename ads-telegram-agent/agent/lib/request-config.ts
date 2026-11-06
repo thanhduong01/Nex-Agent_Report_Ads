@@ -17,7 +17,7 @@ export const requestSchema = z.object({
   format: z.enum(["detailed", "summary"]),
 }).refine(r => r.groupMode === "all" || r.groupIds.length > 0);
 export type BotRequest = z.infer<typeof requestSchema>;
-export const reservedCommands = ["start", "help", "nhom", "lich", "report", "homnay"];
+export const reservedCommands = ["start", "help", "chatid", "nhom", "lich", "report", "homnay"];
 export function defaultRequests(): BotRequest[] {
   return [
     { id: "today", name: "Báo cáo hôm nay", command: "baocao", reportDay: "today" },

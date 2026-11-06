@@ -63,6 +63,7 @@ export async function connectTelegram(force = false) {
     { command: "nhom", description: "Danh sách nhóm báo cáo" },
     { command: "lich", description: "Xem lịch gửi và mở trang cấu hình" },
     { command: "help", description: "Hướng dẫn sử dụng" },
+    { command: "chatid", description: "Lấy ID chat riêng để kết nối báo cáo" },
   ] });
   lastSetup = Date.now();
 }

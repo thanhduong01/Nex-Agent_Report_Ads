@@ -31,6 +31,12 @@ export function telegramRejection(message: { chat: { id: string; type: string };
   return null;
 }
 type CommandMessage = { messageId: string; text: string; chat: { id: string; type: string }; from?: { id: string; isBot?: boolean }; raw?: Record<string, unknown> };
+export function privateChatIdReply(message: CommandMessage) {
+  if (message.text.trim().split(/\s+/)[0].split("@")[0].toLowerCase() !== "/chatid" ||
+      message.chat.type !== "private" || message.from?.id !== message.chat.id || message.from?.isBot) return null;
+  // Public setup utility: only returns the caller's own ID and never reads reports or changes the owner.
+  return `ID chat riêng của bạn: ${message.chat.id}\n\nTELEGRAM_CHAT_ID=${message.chat.id}\n\nĐiền giá trị này vào TELEGRAM_CHAT_ID của Vercel Production, lưu và redeploy. Sau đó thử /help.`;
+}
 export async function receiveTelegramCommand(message: CommandMessage) {
   const rejected = telegramRejection(message);
   if (rejected) { await recordTelegramTraffic("ignored", rejected); return; }
