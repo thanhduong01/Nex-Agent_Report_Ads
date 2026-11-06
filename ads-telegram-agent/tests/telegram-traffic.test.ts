@@ -30,11 +30,11 @@ test("Telegram status identifies the exact bot and validates that the destinatio
   process.env.TELEGRAM_BOT_TOKEN = "123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghi";
   process.env.TELEGRAM_CHAT_ID = "123";
   process.env.VERCEL_PROJECT_PRODUCTION_URL = "example.test"; process.env.VERCEL_ENV = "production";
-  let chatType = "private"; const calls: string[] = [];
+  let chatType = "private", botId = 999; const calls: string[] = [];
   t.mock.method(globalThis, "fetch", async (url: string, options?: RequestInit) => {
     const method = url.split("/").pop()!; calls.push(method);
     if (method === "getChat") assert.equal(JSON.parse(options?.body as string).chat_id, "123");
-    const result = method === "getMe" ? { username: "ReportAdsTestBot" } : method === "getChat" ? { id: 123, type: chatType }
+    const result = method === "getMe" ? { id: botId, username: "ReportAdsTestBot" } : method === "getChat" ? { id: 123, type: chatType }
       : { url: "https://example.test/eve/v1/telegram", pending_update_count: 0 };
     return Response.json({ ok: true, result });
   });
@@ -43,5 +43,7 @@ test("Telegram status identifies the exact bot and validates that the destinatio
   assert(!JSON.stringify(status).includes(process.env.TELEGRAM_BOT_TOKEN));
   chatType = "group";
   await assert.rejects(connectTelegram(true), /TELEGRAM_CHAT_ID chưa đúng chat riêng/);
+  chatType = "private"; botId = 123;
+  await assert.rejects(connectTelegram(true), /đang là ID của bot/);
   assert(!calls.includes("setWebhook"));
 });

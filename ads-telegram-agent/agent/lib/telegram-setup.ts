@@ -37,7 +37,7 @@ export async function telegramConnection() {
     telegramApi("getWebhookInfo"), telegramApi("getMe"),
     telegramApi("getChat", { chat_id: process.env.TELEGRAM_CHAT_ID }), readTelegramTraffic(),
   ]);
-  if (chat.type !== "private") throw new Error("TELEGRAM_CHAT_ID chưa đúng chat riêng. Kiểm tra ID người nhận trên Vercel rồi redeploy.");
+  validateRecipient(bot, chat);
   const expected = productionOrigin() + "/eve/v1/telegram";
   return { connected: info.url === expected, pending: Number(info.pending_update_count || 0),
     hasError: !!info.last_error_date && info.last_error_date > Date.now() / 1000 - 600,
@@ -50,9 +50,9 @@ export async function connectTelegram(force = false) {
   const config = telegramConfiguration();
   if (!config.ready) throw new Error(config.issues.join(" "));
   if (!force && Date.now() - lastSetup < 10 * 60000) return;
-  const info = await telegramApi("getWebhookInfo");
-  const chat = await telegramApi("getChat", { chat_id: process.env.TELEGRAM_CHAT_ID });
-  if (chat.type !== "private") throw new Error("TELEGRAM_CHAT_ID chưa đúng chat riêng. Kiểm tra ID người nhận trên Vercel rồi redeploy.");
+  const [info, bot, chat] = await Promise.all([telegramApi("getWebhookInfo"), telegramApi("getMe"),
+    telegramApi("getChat", { chat_id: process.env.TELEGRAM_CHAT_ID })]);
+  validateRecipient(bot, chat);
   const url = productionOrigin() + "/eve/v1/telegram";
   if (info.url && info.url !== url) throw new Error("Bot đang kết nối hệ thống khác. Kiểm tra webhook đang dùng trước khi chuyển sang Trạm Ads.");
   // Do not discard pending messages. The inbound handler ignores stale setup messages.
@@ -65,4 +65,9 @@ export async function connectTelegram(force = false) {
     { command: "help", description: "Hướng dẫn sử dụng" },
   ] });
   lastSetup = Date.now();
+}
+function validateRecipient(bot: { id?: number | string }, chat: { id?: number | string; type?: string }) {
+  if (chat.type !== "private") throw new Error("TELEGRAM_CHAT_ID chưa đúng chat riêng. Kiểm tra ID người nhận trên Vercel rồi redeploy.");
+  if (bot.id !== undefined && String(bot.id) === process.env.TELEGRAM_CHAT_ID)
+    throw new Error("TELEGRAM_CHAT_ID chưa đúng: đang là ID của bot. Cần dùng ID tài khoản Telegram của bạn, rồi redeploy.");
 }
