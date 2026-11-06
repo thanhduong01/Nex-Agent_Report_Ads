@@ -71,7 +71,7 @@ export async function dashboardApi(request: Request) {
     return json(404, { error: "Không tìm thấy thao tác." });
   } catch (error) {
     if (error instanceof GroupError) return json(error.status, { error: error.message });
-    const message = error instanceof Error && /^(Telegram|Google Sheets trả HTTP|Google yêu cầu|Google không trả|Thiếu tab |Tab |Cấu trúc tab |Không |Nhập |Bot |Chưa |Liên kết |Bản xem |Hãy |Tháng |Kiểm tra |Ngày |Báo cáo vượt)/u.test(error.message)
+    const message = error instanceof Error && /^(Telegram|TELEGRAM_CHAT_ID chưa|Google Sheets trả HTTP|Google yêu cầu|Google không trả|Thiếu tab |Tab |Cấu trúc tab |Không |Nhập |Bot |Chưa |Liên kết |Bản xem |Hãy |Tháng |Kiểm tra |Ngày |Báo cáo vượt)/u.test(error.message)
       ? error.message : "Không thể hoàn tất. Kiểm tra kết nối và cấu hình nguồn rồi thử lại.";
     return json(400, { error: message });
   }

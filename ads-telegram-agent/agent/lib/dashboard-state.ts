@@ -5,6 +5,7 @@ import { getRegistry, hasGroupStorage } from "./groups.ts";
 import { hasDeliveryStorage } from "./delivery.ts";
 import { effectiveSchedule, nextOccurrence } from "./schedule-config.ts";
 import { readSchedulerStatus } from "./scheduler-status.ts";
+import { telegramConfiguration } from "./telegram-token.ts";
 
 export async function dashboardState(cloud = false) {
   const paired = Boolean(process.env.TELEGRAM_BOT_TOKEN && /^[1-9]\d*$/.test(process.env.TELEGRAM_CHAT_ID || ""));
@@ -13,7 +14,8 @@ export async function dashboardState(cloud = false) {
     cloud, defaultDate: yesterday(), deliveryTime: settings.deliveryTime,
     hasToken: !!process.env.TELEGRAM_BOT_TOKEN, paired,
     canSend: paired && (!cloud || hasDeliveryStorage()),
-    canConnectCommands: cloud && paired,
+    canConnectCommands: cloud,
+    telegramConfiguration: telegramConfiguration(),
     localSendEnabled: process.env.SEND_REPORTS === "true",
     groups: registry.groups.map(group => ({ ...group, schedule: effectiveSchedule(group), nextRun: nextOccurrence(effectiveSchedule(group)) })),
     revision: registry.revision, canEditGroups: !cloud || hasGroupStorage(),

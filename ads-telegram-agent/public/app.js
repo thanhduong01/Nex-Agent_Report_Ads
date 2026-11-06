@@ -14,16 +14,17 @@ const el = (name, text, cls) => {
 function external(label, url) {
   const a = el("a", label); a.href = url; a.target = "_blank"; a.rel = "noreferrer"; return a;
 }
-async function api(path, body) {
+async function api(path, body, timeoutMs) {
   const headers = { "X-Tram-Ads": "1" };
   const options = { headers };
+  if (timeoutMs) options.signal = AbortSignal.timeout(timeoutMs);
   if (body !== undefined) {
     headers["Content-Type"] = "application/json";
     options.method = "POST"; options.body = JSON.stringify(body);
   }
   let response;
   try { response = await fetch("/api/" + path, options); }
-  catch { throw new Error("Mất kết nối với bảng điều khiển. Mở lại trên máy rồi thử lại."); }
+  catch { throw new Error(options.signal?.aborted ? "Kiểm tra kết nối quá thời gian chờ. Bấm nút để thử lại." : "Mất kết nối với bảng điều khiển. Tải lại trang rồi thử lại."); }
   let result;
   try { result = await response.json(); }
   catch { throw new Error("Máy chủ chưa trả API báo cáo. Kiểm tra bản deploy và cấu hình Vercel."); }
@@ -52,6 +53,7 @@ function route() {
     if (view === selected) $(nav).setAttribute("aria-current", "page"); else $(nav).removeAttribute("aria-current");
   }
   document.title = ({ settings: "Kết nối & lịch gửi", requests: "Yêu cầu bot", report: "Báo cáo quảng cáo" })[selected] + " · Trạm Ads";
+  if (selected === "settings" && access && state) checkTelegram(false);
 }
 function updateState(data) {
   state = data;
@@ -62,7 +64,6 @@ function updateState(data) {
   $("pairForm").hidden = data.cloud;
   $("cloudTelegram").hidden = !data.cloud;
   $("commandsBox").hidden = !data.cloud;
-  $("connectCommands").disabled = !data.canConnectCommands;
   $("scheduleTime").textContent = data.deliveryTime;
   $("scheduleStatus").textContent = data.localSendEnabled ? "Đã bật trong cấu hình" : "Chưa bật gửi tự động";
   const paired = data.paired;
@@ -74,6 +75,7 @@ function updateState(data) {
   $("tokenHint").textContent = data.hasToken ? "Để trống để dùng token đã lưu, hoặc nhập token của bot mới." : "Token được lưu trên máy sau khi ghép nối.";
   setupGroups(data);
   setupRequests(data);
+  setupTelegram(data);
 }
 function summaryMetric(id, total, count) {
   const node = $(id); node.textContent = total.known ? nf.format(total.value) : "—";
@@ -195,12 +197,3 @@ async function init() {
   }
 }
 init();
-$("connectCommands").onclick = async () => {
-  const button = $("connectCommands"); button.disabled = true;
-  feedback("commandsFeedback", "Đang kết nối lệnh với Telegram…");
-  try {
-    const result = await api("telegram-connect", {});
-    feedback("commandsFeedback", result.connected ? "Đã kết nối và cập nhật menu. Mở Telegram, nhắn /help để xem các yêu cầu đang bật." : "Chưa xác nhận kết nối. Thử lại sau.", !result.connected);
-  } catch (error) { feedback("commandsFeedback", error.message, true); }
-  finally { button.disabled = false; }
-};

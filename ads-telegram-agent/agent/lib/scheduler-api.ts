@@ -31,14 +31,16 @@ export async function schedulerApi(request: Request, deps = defaults) {
       const registry = await deps.registry();
       const due = registry.groups.filter(g => dueOccurrence(effectiveSchedule(g), now)).map(g => g.id);
       let telegramConnected = true;
+      let telegramIssue: string | undefined;
       try { await deps.connect(); } catch (error) {
         telegramConnected = false;
         const message = error instanceof Error ? error.message : "";
-        console.warn("Telegram command setup incomplete:", /^(Bot đang|Chưa cấu hình|Không kết nối được Telegram|Chỉ kết nối bot)/.test(message)
-          ? message : "Kiểm tra kết nối trong bảng điều khiển.");
+        telegramIssue = /^(Bot đang|Chưa cấu hình|Chưa điền TELEGRAM_CHAT_ID|TELEGRAM_CHAT_ID chưa|Không kết nối được Telegram|Chỉ kết nối bot)/.test(message)
+          ? message : "Kiểm tra kết nối trong bảng điều khiển.";
+        console.warn("Telegram command setup incomplete:", telegramIssue);
       }
       await deps.record({ checkedAt: now.toISOString(), runId: identity.runId,
-        enabled: registry.groups.filter(g => effectiveSchedule(g).enabled).length, due: due.length, telegramConnected });
+        enabled: registry.groups.filter(g => effectiveSchedule(g).enabled).length, due: due.length, telegramConnected, telegramIssue });
       return response(200, { ok: true, due, telegramConnected });
     }
     if (typeof body.groupId !== "string" || !/^[a-z0-9-]{1,64}$/.test(body.groupId)) return response(400, { error: "Invalid group" });

@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { getRegistry } from "./groups.ts";
-import { botToken } from "./telegram-token.ts";
+import { botToken, telegramConfiguration } from "./telegram-token.ts";
 
 export function webhookSecret() {
   const token = botToken();
@@ -28,6 +28,8 @@ async function telegramApi(method: string, payload: object = {}) {
   } catch { throw new Error(failure); }
 }
 export async function telegramConnection() {
+  const config = telegramConfiguration();
+  if (!config.ready) throw new Error(config.issues.join(" "));
   const info = await telegramApi("getWebhookInfo");
   const expected = productionOrigin() + "/eve/v1/telegram";
   return { connected: info.url === expected, pending: Number(info.pending_update_count || 0),
@@ -36,7 +38,8 @@ export async function telegramConnection() {
 let lastSetup = 0;
 export async function connectTelegram(force = false) {
   if (process.env.VERCEL_ENV !== "production") throw new Error("Chỉ kết nối bot trên bản production.");
-  if (!/^[1-9]\d*$/.test(process.env.TELEGRAM_CHAT_ID || "")) throw new Error("Chưa cấu hình chat riêng nhận báo cáo.");
+  const config = telegramConfiguration();
+  if (!config.ready) throw new Error(config.issues.join(" "));
   if (!force && Date.now() - lastSetup < 10 * 60000) return;
   const info = await telegramApi("getWebhookInfo");
   const url = productionOrigin() + "/eve/v1/telegram";

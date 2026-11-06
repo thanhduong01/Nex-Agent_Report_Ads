@@ -17,3 +17,12 @@ export function botToken(input = process.env.TELEGRAM_BOT_TOKEN || "") {
     throw new Error("Chưa cấu hình đúng định dạng token Telegram. Dùng toàn bộ token từ BotFather, gồm phần số, dấu : và phần chữ phía sau.");
   return value;
 }
+
+export function telegramConfiguration() {
+  const issues: string[] = [];
+  try { botToken(); } catch (error) { issues.push((error as Error).message); }
+  const chat = process.env.TELEGRAM_CHAT_ID || "";
+  if (!chat) issues.push("Chưa điền TELEGRAM_CHAT_ID trong Vercel Production. Dùng ID chat riêng của bạn, rồi redeploy.");
+  else if (!/^[1-9]\d*$/.test(chat)) issues.push("TELEGRAM_CHAT_ID chưa đúng định dạng chat riêng. Chỉ điền dãy số ID của bạn, không kèm chữ, dấu nháy hoặc khoảng trắng, rồi redeploy.");
+  return { ready: issues.length === 0, issues };
+}
