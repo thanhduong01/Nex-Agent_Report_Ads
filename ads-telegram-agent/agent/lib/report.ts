@@ -1,4 +1,5 @@
 import { products, settings } from "./config.ts";
+import { APP_NAME } from "./brand.ts";
 import type { Product, Source } from "./config.ts";
 
 export type Cell = string | number | boolean | null;
@@ -155,6 +156,7 @@ export function renderReport(report: Report): string {
   const { totals: t } = report;
   const trackedCount = report.rows.filter(r => r.tracksPhones).length;
   const lines = [
+    APP_NAME,
     `📊 BÁO CÁO QUẢNG CÁO — ${report.date.split("-").reverse().join("/")}`,
     ...(report.groupName ? [report.groupName] : []),
     `Chi phí: ${metric(t.cost, true)}`,

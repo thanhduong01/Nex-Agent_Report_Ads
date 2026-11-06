@@ -52,7 +52,7 @@ function route() {
     $(view + "View").hidden = !access || view !== selected;
     if (view === selected) $(nav).setAttribute("aria-current", "page"); else $(nav).removeAttribute("aria-current");
   }
-  document.title = ({ settings: "Kết nối & lịch gửi", requests: "Yêu cầu bot", report: "Báo cáo quảng cáo" })[selected] + " · Trạm Ads";
+  document.title = ({ settings: "Kết nối & lịch gửi", requests: "Yêu cầu bot", report: "Báo cáo quảng cáo" })[selected] + " · Nex Report Ads Performance";
   if (selected === "settings" && access && state) checkTelegram(false);
 }
 function updateState(data) {

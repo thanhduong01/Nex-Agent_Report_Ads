@@ -3,6 +3,7 @@ import { requestSchema, reservedCommands, normalizeText, resolveRequest, type Bo
 import { prepareReport } from "./job.ts";
 import { vietnamDate } from "./schedule-config.ts";
 import type { Report } from "./report.ts";
+import { APP_NAME } from "./brand.ts";
 
 export function validateBotRequest(input: unknown, registry: Registry) {
   const parsed = requestSchema.safeParse(input);
@@ -34,7 +35,7 @@ export function formatRequestReport(rule: BotRequest, report: Report, text: stri
   const nf = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
   const metric = (name: string, data: { value: number; known: number; complete: boolean }, unit = "") =>
     `${name}: ${data.known ? nf.format(data.value) + unit : "Chưa nhập"}${data.known && !data.complete ? " (dữ liệu một phần)" : ""}`;
-  return [`${report.groupName || rule.name} · ${date}`, date === vietnamDate() ? "Số liệu hôm nay · đang cập nhật" : "Báo cáo tổng quan", "",
+  return [APP_NAME, `${report.groupName || rule.name} · ${date}`, date === vietnamDate() ? "Số liệu hôm nay · đang cập nhật" : "Báo cáo tổng quan", "",
     metric("Chi phí", report.totals.cost, " ₫"), metric("Tin nhắn", report.totals.messages),
     report.rows.some(r => r.tracksPhones) ? metric("SĐT", report.totals.phones) : "SĐT: Không theo dõi",
     "", "SĐT chỉ tính sản phẩm có theo dõi chỉ số này."].join("\n");

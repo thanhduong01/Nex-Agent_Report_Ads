@@ -1,15 +1,15 @@
-# Agent báo cáo quảng cáo qua Telegram
+# Nex Report Ads Performance
 
 Agent đọc file Google Sheets theo tháng, tính chỉ số bằng code và gửi báo cáo
 ngày hôm trước lúc **09:00, Asia/Ho_Chi_Minh**. Phần nhận xét AI có thể bật thêm.
 Đây là mã nguồn đã chuẩn bị để kết nối và triển khai; chưa có credentials hoặc
 lịch chạy nào được kích hoạt trên cloud.
 
-## Mở bảng điều khiển Trạm Ads
+## Mở bảng điều khiển Nex Report Ads Performance
 
 Trong thư mục dự án, dùng Node.js 24, chạy `npm ci` nếu chưa cài thư viện,
 rồi chạy `npm run ui`. Giữ cửa sổ Terminal mở và vào
-[Trạm Ads trên máy này](http://127.0.0.1:4317).
+[Nex Report Ads Performance trên máy này](http://127.0.0.1:4317).
 
 1. Ở **Báo cáo**, chọn ngày để xem chi phí, tin nhắn, SĐT và số sản phẩm đã nhập từng chỉ số. Bấm **Xem trước bản tin** để đọc nội dung sẽ gửi.
 2. Ở **Kết nối**, dán token của BotFather rồi chọn **Tạo liên kết ghép nối**. Mở liên kết, nhấn **Start** trong Telegram và quay lại bấm **Đã nhấn Start · Xác nhận**. Chỉ cuộc trò chuyện riêng có mã ghép nối đó được lưu. [Cơ chế liên kết của Telegram](https://core.telegram.org/bots/features#deep-linking).

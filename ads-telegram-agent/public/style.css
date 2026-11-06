@@ -19,7 +19,7 @@ button:disabled { cursor: default; opacity: .55; }
 :where(h1,h2,h3,p) { margin: 0; }
 .wrap { width: min(1240px, 91%); margin: 0 auto; }
 .mast { background: var(--paper); border-bottom: 1px solid var(--line); }
-.top { display: flex; min-height: 73px; align-items: center; gap: clamp(24px, 5vw, 80px); }
+.top { display: flex; min-height: 73px; align-items: center; gap: clamp(16px, 2.2vw, 30px); }
 .brand { display: inline-flex; gap: 10px; align-items: center; font-size: 23px; font-weight: 760; color: var(--ink); text-decoration: none; letter-spacing: -.055em; }
 nav, nav a, .local, .inline, .sectionLine, .panelHead, .timeLine, .ticketHead, .dialogHead, .dialogActions { display: flex; align-items: center; }
 nav { align-self: stretch; gap: 23px; }
@@ -261,3 +261,13 @@ select { font: inherit; color: var(--ink); background: var(--paper); border: 1px
  nav a { padding: 4px 0; font-size: 13px; }
  .requestScheduleLink { width: 100%; justify-content: center; }
 }
+
+/* Full product name stays legible in narrow headers. */
+.brandName { max-width: 210px; font-size: 18px; line-height: 1.15; letter-spacing: -.03em; }
+footer { gap: 12px; flex-wrap: wrap; }
+@media (min-width: 761px) and (max-width: 1100px) {
+ .top { flex-wrap: wrap; gap: 16px; padding-top: 12px; }
+ .top nav { order: 3; width: 100%; min-height: 48px; justify-content: flex-start; }
+ .top #logout { margin-left: 0; }
+}
+@media (max-width: 480px) { .brandName { max-width: 165px; font-size: 16px; } }

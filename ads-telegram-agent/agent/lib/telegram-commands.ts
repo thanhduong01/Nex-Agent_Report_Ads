@@ -6,6 +6,7 @@ import { defaultRequests, resolveRequest } from "./request-config.ts";
 import { groupsForRequest, requestReport } from "./request-actions.ts";
 import { recordTelegramTraffic } from "./telegram-traffic.ts";
 import { DeliveryError } from "./delivery.ts";
+import { APP_NAME } from "./brand.ts";
 
 const normalize = (value: string) => value.normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/g, "d").toLowerCase().trim();
 export function parseReportCommand(text: string, now = new Date()) {
@@ -35,7 +36,7 @@ export function privateChatIdReply(message: CommandMessage) {
   if (message.text.trim().split(/\s+/)[0].split("@")[0].toLowerCase() !== "/chatid" ||
       message.chat.type !== "private" || message.from?.id !== message.chat.id || message.from?.isBot) return null;
   // Public setup utility: only returns the caller's own ID and never reads reports or changes the owner.
-  return `ID chat riêng của bạn: ${message.chat.id}\n\nTELEGRAM_CHAT_ID=${message.chat.id}\n\nĐiền giá trị này vào TELEGRAM_CHAT_ID của Vercel Production, lưu và redeploy. Sau đó thử /help.`;
+  return `${APP_NAME}\n\nID chat riêng của bạn: ${message.chat.id}\n\nTELEGRAM_CHAT_ID=${message.chat.id}\n\nĐiền giá trị này vào TELEGRAM_CHAT_ID của Vercel Production, lưu và redeploy. Sau đó thử /help.`;
 }
 export async function receiveTelegramCommand(message: CommandMessage) {
   const rejected = telegramRejection(message);
@@ -71,7 +72,7 @@ export async function handleTelegramCommand(message: CommandMessage, onDelivery?
   try { registry = await getRegistry(); }
   catch { await send("config-error", "Chưa đọc được cấu hình yêu cầu. Thử lại sau hoặc kiểm tra trên web."); return; }
   const groups = registry.groups;
-  const help = "TRẠM ADS · YÊU CẦU ĐÃ CẤU HÌNH\n\n" + registry.requests.filter(r => r.enabled).map(r =>
+  const help = APP_NAME + " · YÊU CẦU ĐÃ CẤU HÌNH\n\n" + registry.requests.filter(r => r.enabled).map(r =>
     `/${r.command} — ${r.name} (${r.reportDay === "today" ? "hôm nay" : "hôm qua"})` +
     (r.allowDate ? `\nVí dụ: /${r.command} 02/11/2026` : "") +
     (r.phrases.length ? "\nHoặc nhắn: " + r.phrases.join(" · ") : "")
@@ -82,7 +83,7 @@ export async function handleTelegramCommand(message: CommandMessage, onDelivery?
   catch (error) { await send("invalid", (error as Error).message + "\nDùng YYYY-MM-DD hoặc DD/MM/YYYY khi yêu cầu cho phép chọn ngày."); return; }
   if (!parsed && !["/nhom", "/lich"].includes(command)) { await send("help", help); return; }
   if (command === "/nhom") {
-    await send("groups", "NHÓM BÁO CÁO\n\n" + groups.map(g => `${g.name}\nMã: ${g.id}`).join("\n\n")); return;
+    await send("groups", APP_NAME + " · NHÓM BÁO CÁO\n\n" + groups.map(g => `${g.name}\nMã: ${g.id}`).join("\n\n")); return;
   }
   if (command === "/lich") {
     const dayNames = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
@@ -91,7 +92,7 @@ export async function handleTelegramCommand(message: CommandMessage, onDelivery?
       return `${g.name}: ${s.enabled ? s.time + " · " + s.days.map(d => dayNames[d]).join(", ") : "Tạm dừng"}\nBáo cáo ${s.reportDay === "today" ? "hôm nay" : "hôm qua"}` +
         (next ? "\nLần tới: " + new Date(next).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" }) : "");
     });
-    await send("schedule", "LỊCH GỬI · GIỜ VIỆT NAM\n\n" + lines.join("\n\n") + "\n\nChỉnh lịch: " + productionOrigin() + "/#settings"); return;
+    await send("schedule", APP_NAME + " · LỊCH GỬI · GIỜ VIỆT NAM\n\n" + lines.join("\n\n") + "\n\nChỉnh lịch: " + productionOrigin() + "/#settings"); return;
   }
   let selected;
   try { selected = groupsForRequest(groups, parsed!.rule, parsed!.group); }

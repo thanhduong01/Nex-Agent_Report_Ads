@@ -9,6 +9,7 @@ import { DeliveryError, telegramSend } from "../../agent/lib/delivery.ts";
 import { createPairing } from "./local-config.ts";
 import { dashboardState } from "../../agent/lib/dashboard-state.ts";
 import { requestAction } from "../../agent/lib/request-actions.ts";
+import { APP_NAME } from "../../agent/lib/brand.ts";
 
 const port = Number(process.env.DASHBOARD_PORT || 4317);
 const host = "127.0.0.1:" + port;
@@ -93,4 +94,4 @@ const server = createServer(async (req, res) => {
     return json(400, { error: message });
   }
 });
-server.listen(port, "127.0.0.1", () => console.log("Trạm Ads · " + origin));
+server.listen(port, "127.0.0.1", () => console.log(APP_NAME + " · " + origin));

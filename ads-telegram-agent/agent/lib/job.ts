@@ -5,6 +5,7 @@ import { liveReport } from "./sheets.ts";
 import { renderReport } from "./report.ts";
 import type { Report } from "./report.ts";
 import { dueOccurrence, effectiveSchedule } from "./schedule-config.ts";
+import { APP_NAME } from "./brand.ts";
 
 async function analysis(report: Report): Promise<string> {
   if (process.env.AI_ENABLED !== "true") return "";
@@ -41,7 +42,7 @@ export async function scheduledReport(now = new Date(), groupId?: string) {
     } catch {
       try {
         await deliverOnce(deliveryKey(date, kind + "-error"),
-          `⚠️ Chưa hoàn tất báo cáo ${group.name} ngày ${date}. Kiểm tra nguồn tháng, quyền đọc và lịch sử gửi trước khi chạy lại.`);
+          `⚠️ ${APP_NAME}\nChưa hoàn tất báo cáo ${group.name} ngày ${date}. Kiểm tra nguồn tháng, quyền đọc và lịch sử gửi trước khi chạy lại.`);
       } catch { /* Continue other report groups even when this group's notification fails. */ }
       results.push({ groupId: group.id, status: "failed" });
     }

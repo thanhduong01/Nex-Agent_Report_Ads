@@ -1,4 +1,4 @@
-# Nex-Agent Report Ads · Trạm Ads
+# Nex Report Ads Performance
 
 Agent đọc báo cáo quảng cáo từ Google Sheets theo tháng và gửi kết quả qua Telegram theo lệnh hoặc lịch riêng từng nhóm (giờ Việt Nam).
 
@@ -16,7 +16,7 @@ cp .env.example .env.local
 npm run ui
 ```
 
-Mở [Trạm Ads](http://127.0.0.1:4317), vào **Kết nối** để đăng ký file Sheets và ghép nối bot Telegram. Nhóm và nguồn trên máy được lưu trong `.data/report-groups.json`, thông tin đăng nhập trong `.env.local`.
+Mở [Nex Report Ads Performance](http://127.0.0.1:4317), vào **Kết nối** để đăng ký file Sheets và ghép nối bot Telegram. Nhóm và nguồn trên máy được lưu trong `.data/report-groups.json`, thông tin đăng nhập trong `.env.local`.
 
 ## Gửi tự động
 
