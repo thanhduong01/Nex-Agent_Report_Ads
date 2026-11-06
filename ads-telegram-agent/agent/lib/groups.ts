@@ -6,6 +6,7 @@ import { resolve, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { scheduleSchema } from "./schedule-config.ts";
 import { defaultRequests, requestSchema } from "./request-config.ts";
+import { reportDefinitionSchema, metricSchema, parametersSchema } from "./report-definition.ts";
 
 export const monthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
 export const groupSchema = z.object({
@@ -14,10 +15,12 @@ export const groupSchema = z.object({
   enabled: z.boolean(),
   schedule: scheduleSchema.optional(),
   sources: z.record(monthSchema, sourceSchema),
+  report: reportDefinitionSchema.optional(),
 });
 export type ReportGroup = z.infer<typeof groupSchema>;
 const registrySchema = z.object({ version: z.literal(1), revision: z.number().int().nonnegative(), groups: z.array(groupSchema).max(30),
-  requests: z.array(requestSchema).max(20).default(defaultRequests) });
+  requests: z.array(requestSchema).max(20).default(defaultRequests),
+  metrics: z.array(metricSchema).max(25).optional(), parameters: parametersSchema.optional() });
 export type Registry = z.infer<typeof registrySchema>;
 const blobPath = () => `report-config/${process.env.VERCEL_ENV || "production"}/groups.json`;
 const localPath = () => process.env.REPORT_CONFIG_PATH || resolve(process.cwd(), ".data/report-groups.json");
