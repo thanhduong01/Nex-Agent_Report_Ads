@@ -252,3 +252,7 @@ Agent chỉ được cấp tool đọc báo cáo; các công cụ shell, sửa f
 ## Rollback triển khai
 
 Nếu cần quay lại bản trước, tắt workflow **Report scheduler** trên GitHub trước, sau đó promote deployment Vercel đã xác minh hoạt động. Không quay về commit có cron mỗi phút vì Vercel Hobby sẽ từ chối. Nguồn và lịch lưu trong Blob được giữ nguyên; kiểm tra đăng nhập, đọc báo cáo, `/api/schedule-tick` trả 401 khi thiếu token và trạng thái webhook trước khi bật workflow lại.
+
+## Kiểm tra khi bot không phản hồi
+
+Trong Kết nối, ứng dụng xác minh token, địa chỉ webhook và quyền truy cập chat riêng bằng Telegram API. Liên kết “Mở @...” dẫn đến đúng bot của token đang triển khai. Sau khi gửi `/help`, bấm kiểm tra kết nối để đọc trạng thái lệnh gần nhất: chưa nhận, bị bỏ qua do chat/người gửi không khớp, đang xử lý, đã gửi, đã ghi nhận hoặc lỗi kho lịch sử/Telegram. Dữ liệu chẩn đoán chỉ lưu thời điểm, giai đoạn và mã nguyên nhân trong Blob riêng tư; không lưu nội dung tin, chat ID hoặc token. “Đã kết nối” xác nhận cấu hình webhook, không tự khẳng định một lệnh đã được trả lời.

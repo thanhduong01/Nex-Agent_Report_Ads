@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import { getRegistry } from "./groups.ts";
 import { botToken, telegramConfiguration } from "./telegram-token.ts";
+import { readTelegramTraffic } from "./telegram-traffic.ts";
 
 export function webhookSecret() {
   const token = botToken();
@@ -21,7 +22,9 @@ async function telegramApi(method: string, payload: object = {}) {
     });
     const data = await response.json() as { ok: boolean; result: any; error_code?: number };
     if (!response.ok || !data.ok) {
-      failure = `Không kết nối được Telegram (${method}: HTTP ${response.status}, API ${Number(data.error_code) || response.status}). Kiểm tra bot token và cấu hình kết nối.`;
+      failure = method === "getChat" && [400, 403].includes(response.status)
+        ? `TELEGRAM_CHAT_ID chưa truy cập được chat riêng (HTTP ${response.status}). Mở đúng bot, nhấn Start, bỏ chặn bot nếu có và kiểm tra ID người nhận trên Vercel.`
+        : `Không kết nối được Telegram (${method}: HTTP ${response.status}, API ${Number(data.error_code) || response.status}). Kiểm tra bot token và cấu hình kết nối.`;
       throw new Error();
     }
     return data.result;
@@ -30,10 +33,16 @@ async function telegramApi(method: string, payload: object = {}) {
 export async function telegramConnection() {
   const config = telegramConfiguration();
   if (!config.ready) throw new Error(config.issues.join(" "));
-  const info = await telegramApi("getWebhookInfo");
+  const [info, bot, chat, traffic] = await Promise.all([
+    telegramApi("getWebhookInfo"), telegramApi("getMe"),
+    telegramApi("getChat", { chat_id: process.env.TELEGRAM_CHAT_ID }), readTelegramTraffic(),
+  ]);
+  if (chat.type !== "private") throw new Error("TELEGRAM_CHAT_ID chưa đúng chat riêng. Kiểm tra ID người nhận trên Vercel rồi redeploy.");
   const expected = productionOrigin() + "/eve/v1/telegram";
   return { connected: info.url === expected, pending: Number(info.pending_update_count || 0),
-    hasError: !!info.last_error_date && info.last_error_date > Date.now() / 1000 - 600 };
+    hasError: !!info.last_error_date && info.last_error_date > Date.now() / 1000 - 600,
+    botUsername: typeof bot.username === "string" && /^[A-Za-z0-9_]{5,32}$/.test(bot.username) ? bot.username : null,
+    traffic };
 }
 let lastSetup = 0;
 export async function connectTelegram(force = false) {
@@ -42,6 +51,8 @@ export async function connectTelegram(force = false) {
   if (!config.ready) throw new Error(config.issues.join(" "));
   if (!force && Date.now() - lastSetup < 10 * 60000) return;
   const info = await telegramApi("getWebhookInfo");
+  const chat = await telegramApi("getChat", { chat_id: process.env.TELEGRAM_CHAT_ID });
+  if (chat.type !== "private") throw new Error("TELEGRAM_CHAT_ID chưa đúng chat riêng. Kiểm tra ID người nhận trên Vercel rồi redeploy.");
   const url = productionOrigin() + "/eve/v1/telegram";
   if (info.url && info.url !== url) throw new Error("Bot đang kết nối hệ thống khác. Kiểm tra webhook đang dùng trước khi chuyển sang Trạm Ads.");
   // Do not discard pending messages. The inbound handler ignores stale setup messages.

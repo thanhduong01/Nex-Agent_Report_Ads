@@ -21,11 +21,27 @@ async function checkTelegram(connect = false) {
   if (!connect && Date.now() - telegramCheckedAt < 30000) return;
   telegramBusy = true;
   const button = $("connectCommands"), label = button.textContent;
+  if ($("connectedBot")) $("connectedBot").hidden = true;
   button.disabled = true; button.setAttribute("aria-busy", "true");
   button.textContent = connect ? "Đang kết nối Telegram…" : "Đang kiểm tra kết nối…";
   feedback("commandsFeedback", connect ? "Đang kết nối và cập nhật menu lệnh…" : "Đang kiểm tra kết nối Telegram hiện tại…");
   try {
     const result = await api(connect ? "telegram-connect" : "telegram-status", connect ? {} : undefined, connect ? 65000 : 20000);
+    const botLink = $("connectedBot");
+    if (botLink && result.botUsername) {
+      botLink.href = "https://t.me/" + result.botUsername; botLink.textContent = "Mở @" + result.botUsername + " ↗"; botLink.hidden = false;
+    }
+    const traffic = $("telegramTraffic"), last = result.traffic;
+    if (traffic) {
+      const reasons = { "missing-chat": "Chưa cấu hình người nhận.", "private-only": "Lệnh được gửi trong nhóm. Hãy nhắn riêng cho bot.",
+        "chat-mismatch": "Bot nhận được lệnh nhưng chat gửi không trùng TELEGRAM_CHAT_ID. Cập nhật đúng ID chat riêng của bạn trên Vercel rồi redeploy.",
+        "sender-mismatch": "Người gửi chưa trùng chủ sở hữu đã cấu hình.", "stale": "Tin nhắn cũ quá 1 giờ đã được bỏ qua. Hãy gửi lệnh mới.",
+        "telegram-rejected": "Telegram từ chối gửi trả lời. Kiểm tra chat nhận và bỏ chặn bot.", "delivery-uncertain": "Chưa xác nhận được kết quả gửi. Kiểm tra Telegram trước khi gửi lại.",
+        "delivery-storage": "Bot đã nhận lệnh nhưng chưa ghi được lịch sử gửi. Kiểm tra kho Blob hoặc Redis trên Vercel." };
+      traffic.textContent = !last ? "Chưa ghi nhận lệnh trên bản mới. Mở đúng bot ở trên, nhắn /help rồi quay lại kiểm tra kết nối."
+        : "Lệnh gần nhất · " + new Date(last.at).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" }) + " · " +
+          (reasons[last.reason] || ({ received: "Đang xử lý lệnh.", sent: "Đã gửi phản hồi.", duplicate: "Lệnh đã được ghi nhận trước đó. Gửi một tin nhắn mới để lấy lại báo cáo.", failed: "Chưa hoàn tất trả lời.", ignored: "Lệnh đã bị bỏ qua." })[last.outcome]);
+    }
     if (result.connected && !result.hasError) showTelegramResult(connect
       ? "Đã kết nối và cập nhật menu. Mở Telegram, nhắn /help để xem các yêu cầu đang bật."
       : "Đã kết nối Telegram. Bạn có thể nhắn /help hoặc dùng các yêu cầu đã lưu.", true);

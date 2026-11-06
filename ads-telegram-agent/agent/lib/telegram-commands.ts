@@ -4,6 +4,8 @@ import { effectiveSchedule, nextOccurrence } from "./schedule-config.ts";
 import { productionOrigin } from "./telegram-setup.ts";
 import { defaultRequests, resolveRequest } from "./request-config.ts";
 import { groupsForRequest, requestReport } from "./request-actions.ts";
+import { recordTelegramTraffic } from "./telegram-traffic.ts";
+import { DeliveryError } from "./delivery.ts";
 
 const normalize = (value: string) => value.normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/g, "d").toLowerCase().trim();
 export function parseReportCommand(text: string, now = new Date()) {
@@ -18,17 +20,45 @@ export function selectGroups(groups: ReportGroup[], input: string) {
   return found;
 }
 export function allowedTelegramMessage(message: { chat: { id: string; type: string }; from?: { id: string; isBot?: boolean } }) {
-  const owner = process.env.TELEGRAM_CHAT_ID;
-  return !!owner && message.chat.type === "private" && message.chat.id === owner && message.from?.id === owner && !message.from.isBot;
+  return telegramRejection(message) === null;
 }
-export async function handleTelegramCommand(message: { messageId: string; text: string; chat: { id: string; type: string }; from?: { id: string; isBot?: boolean }; raw?: Record<string, unknown> }) {
+export function telegramRejection(message: { chat: { id: string; type: string }; from?: { id: string; isBot?: boolean } }) {
+  const owner = process.env.TELEGRAM_CHAT_ID;
+  if (!owner) return "missing-chat";
+  if (message.chat.type !== "private") return "private-only";
+  if (message.chat.id !== owner) return "chat-mismatch";
+  if (message.from?.id !== owner || message.from.isBot) return "sender-mismatch";
+  return null;
+}
+type CommandMessage = { messageId: string; text: string; chat: { id: string; type: string }; from?: { id: string; isBot?: boolean }; raw?: Record<string, unknown> };
+export async function receiveTelegramCommand(message: CommandMessage) {
+  const rejected = telegramRejection(message);
+  if (rejected) { await recordTelegramTraffic("ignored", rejected); return; }
+  if (typeof message.raw?.date === "number" && message.raw.date < Date.now() / 1000 - 3600) {
+    await recordTelegramTraffic("ignored", "stale"); return;
+  }
+  await recordTelegramTraffic("received");
+  let outcome: "sent" | "duplicate" = "duplicate";
+  try {
+    await handleTelegramCommand(message, status => { if (status === "sent") outcome = "sent"; });
+    await recordTelegramTraffic(outcome);
+  } catch (error) {
+    const reason = error instanceof DeliveryError ? (error.definitelyRejected ? "telegram-rejected" : "delivery-uncertain") : "delivery-storage";
+    await recordTelegramTraffic("failed", reason);
+    console.warn("Lệnh Telegram chưa hoàn tất:", reason);
+  }
+}
+export async function handleTelegramCommand(message: CommandMessage, onDelivery?: (status: "sent" | "already-recorded") => void) {
   if (!allowedTelegramMessage(message)) return;
   const sentAt = message.raw?.date;
   if (typeof sentAt === "number" && sentAt < Date.now() / 1000 - 3600) return;
   const prefix = "command-" + message.messageId;
   const send = async (part: string, text: string) => {
     const chunks = text.match(/[\s\S]{1,3900}/g) || [];
-    for (const [index, chunk] of chunks.entries()) await deliverOnce(deliveryKey("telegram", prefix + "-" + part + "-" + index), chunk);
+    for (const [index, chunk] of chunks.entries()) {
+      const result = await deliverOnce(deliveryKey("telegram", prefix + "-" + part + "-" + index), chunk);
+      onDelivery?.(result.status);
+    }
   };
   const command = message.text.trim().split(/\s/)[0].split("@")[0].toLowerCase();
   let registry: Registry;
