@@ -4,6 +4,7 @@ import { prepareReport } from "./job.ts";
 import { vietnamDate } from "./schedule-config.ts";
 import type { Report } from "./report.ts";
 import { APP_NAME } from "./brand.ts";
+import type { ReportOptions } from "./report-service.ts";
 
 export function validateBotRequest(input: unknown, registry: Registry) {
   const parsed = requestSchema.safeParse(input);
@@ -19,18 +20,19 @@ export function validateBotRequest(input: unknown, registry: Registry) {
   return rule;
 }
 export function groupsForRequest(groups: ReportGroup[], rule: BotRequest, input = "") {
-  const available = groups.filter(g => (rule.groupMode === "all" || rule.groupIds.includes(g.id)) && Object.keys(g.sources).length);
+  const available = groups.filter(g => (rule.groupMode === "all" || rule.groupIds.includes(g.id)) && (Object.keys(g.sources).length || (g.report && g.report.source !== "sheets")));
   if (!input || ["all", "tat ca"].includes(normalizeText(input))) return available;
   const selected = available.filter(g => g.id === input || normalizeText(g.name) === normalizeText(input));
   if (selected.length !== 1) throw new GroupError("Nhóm này không thuộc yêu cầu. Kiểm tra tên nhóm hoặc cấu hình trên web.");
   return selected;
 }
-export async function requestReport(rule: BotRequest, date: string, groupId: string) {
-  const { report, text } = await prepareReport(date, groupId);
+export async function requestReport(rule: BotRequest, date: string, groupId: string, options: ReportOptions = {}) {
+  const { report, text } = await prepareReport(date, groupId, {...options, summary:rule.format === "summary"});
   return formatRequestReport(rule, report, text);
 }
 export function formatRequestReport(rule: BotRequest, report: Report, text: string) {
   const date = report.date;
+  if (report.metricValues) return (date === vietnamDate() ? "SỐ LIỆU HÔM NAY · ĐANG CẬP NHẬT\n\n" : "") + text;
   if (rule.format === "detailed") return (date === vietnamDate() ? "SỐ LIỆU HÔM NAY · ĐANG CẬP NHẬT\n\n" : "") + text;
   const nf = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
   const metric = (name: string, data: { value: number; known: number; complete: boolean }, unit = "") =>
@@ -53,7 +55,8 @@ export async function requestAction(path: string, body: Record<string, unknown>)
     if (!groups.length) throw new GroupError("Thêm nguồn cho nhóm trước khi chạy thử.");
     const reports = [];
     for (const group of groups) {
-      try { reports.push({ group: group.name, text: await requestReport(rule, resolved.date, group.id) }); }
+      try { reports.push({ group: group.name, text: await requestReport(rule, resolved.date, group.id, {from:resolved.from,
+        ...(resolved.templatePeriod ? {period:group.report?.period || "today"} : {})}) }); }
       catch { reports.push({ group: group.name, text: `Chưa đọc được số liệu ngày ${resolved.date}. Kiểm tra nguồn tháng, quyền chia sẻ và các cột của nhóm ${group.name}.` }); }
     }
     return { date: resolved.date, reports };

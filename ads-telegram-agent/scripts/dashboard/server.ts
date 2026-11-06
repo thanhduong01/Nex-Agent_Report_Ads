@@ -10,13 +10,17 @@ import { createPairing } from "./local-config.ts";
 import { dashboardState } from "../../agent/lib/dashboard-state.ts";
 import { requestAction } from "../../agent/lib/request-actions.ts";
 import { APP_NAME } from "../../agent/lib/brand.ts";
+import { metaAction, metaCampaigns } from "../../agent/lib/meta.ts";
+import { reportManagement } from "../../agent/lib/report-management.ts";
+import { reportHistory, recordReportRun } from "../../agent/lib/report-history.ts";
+import { limitAdminOperation } from "../../agent/lib/admin-rate-limit.ts";
 
 const port = Number(process.env.DASHBOARD_PORT || 4317);
 const host = "127.0.0.1:" + port;
 const origin = "http://" + host;
 const pairing = createPairing();
 const assets = new Map([["/", ["index.html", "text/html"]], ["/style.css", ["style.css", "text/css"]],
-  ["/telegram.js", ["telegram.js", "text/javascript"]], ["/requests.js", ["requests.js", "text/javascript"]], ["/groups.js", ["groups.js", "text/javascript"]], ["/app.js", ["app.js", "text/javascript"]], ["/mark.svg", ["mark.svg", "image/svg+xml"]]]);
+  ["/telegram.js", ["telegram.js", "text/javascript"]], ["/requests.js", ["requests.js", "text/javascript"]], ["/groups.js", ["groups.js", "text/javascript"]], ["/report-builder.js", ["report-builder.js", "text/javascript"]], ["/app.js", ["app.js", "text/javascript"]], ["/mark.svg", ["mark.svg", "image/svg+xml"]]]);
 const drafts = new Map<string, { text: string; until: number }>();
 const privateChat = () => Boolean(process.env.TELEGRAM_BOT_TOKEN && /^[1-9]\d*$/.test(process.env.TELEGRAM_CHAT_ID || ""));
 function status() {
@@ -44,9 +48,11 @@ const server = createServer(async (req, res) => {
     }
     if (req.headers["x-tram-ads"] !== "1") return json(403, { error: "Hãy mở bảng điều khiển." });
     if (req.method === "GET" && url.pathname === "/api/state") return json(200, await status());
+    if (req.method === "GET" && url.pathname === "/api/report-history") return json(200,{runs:await reportHistory()});
     if (req.method === "GET" && url.pathname === "/api/report") {
       const date = validateDate(url.searchParams.get("date") || yesterday());
-      const { report, text } = await prepareReport(date, url.searchParams.get("group") || "default");
+      const { report, text } = await prepareReport(date, url.searchParams.get("group") || "default", {from:url.searchParams.get("from") || undefined});
+      await recordReportRun({groupId:report.groupId||"default",groupName:report.groupName||"Báo cáo",from:report.range?.from||date,to:date,source:report.sourceKind||"sheets",status:"prepared",mode:"web"});
       const id = randomUUID();
       for (const [key, entry] of drafts) if (entry.until < Date.now()) drafts.delete(key);
       if (drafts.size >= 50) drafts.delete(drafts.keys().next().value!);
@@ -58,9 +64,19 @@ const server = createServer(async (req, res) => {
     let body = "";
     for await (const chunk of req) {
       body += chunk;
-      if (body.length > 8192) return json(413, { error: "Nội dung quá dài." });
+      if (body.length > 32000) return json(413, { error: "Nội dung quá dài." });
     }
     const data = JSON.parse(body) as Record<string, unknown>;
+    if (!data || Array.isArray(data) || typeof data !== "object") return json(400,{error:"Yêu cầu không hợp lệ."});
+    if (url.pathname === "/api/meta") { limitAdminOperation("meta",10);return json(200,await metaAction(data)); }
+    if (url.pathname === "/api/meta-campaigns") {
+      limitAdminOperation("meta-campaigns");
+      if(typeof data.connectionId!=="string"||typeof data.accountId!=="string")return json(400,{error:"Chọn kết nối và tài khoản Meta."});
+      return json(200,{campaigns:await metaCampaigns(data.connectionId,data.accountId)});
+    }
+    if (["/api/metric","/api/formula-preview","/api/report-definition","/api/template-preview"].includes(url.pathname)) {
+      limitAdminOperation(url.pathname);return json(200,await reportManagement(url.pathname,data));
+    }
     const field = (name: string) => typeof data[name] === "string" ? data[name] : "";
     if (["/api/request", "/api/request-preview"].includes(url.pathname)) return json(200, await requestAction(url.pathname, data));
     if (["/api/inspect", "/api/group"].includes(url.pathname)) return json(200, await groupAction(url.pathname, data));

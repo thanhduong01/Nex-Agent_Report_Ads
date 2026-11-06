@@ -6,6 +6,7 @@ export const scheduleSchema = z.object({
   days: z.array(z.number().int().min(0).max(6)).min(1).max(7)
     .refine(days => new Set(days).size === days.length),
   reportDay: z.enum(["yesterday", "today"]),
+  period: z.enum(["last7", "month"]).optional(),
   startAt: z.string().datetime().optional(),
 });
 export type ReportSchedule = z.infer<typeof scheduleSchema>;
@@ -25,8 +26,9 @@ export function dueOccurrence(schedule: ReportSchedule, now = new Date()) {
     const day = new Date(date + "T00:00:00Z").getUTCDay();
     if (age < 0 || age >= 2 * 3600000 || !schedule.days.includes(day)) continue;
     if (schedule.startAt && at < Date.parse(schedule.startAt)) continue;
-    return { key: date + "T" + schedule.time + ":" + schedule.reportDay,
-      reportDate: schedule.reportDay === "today" ? date : shiftDate(date, -1) };
+    return { key: date + "T" + schedule.time + ":" + (schedule.period || schedule.reportDay),
+      reportDate: schedule.period ? date : schedule.reportDay === "today" ? date : shiftDate(date, -1),
+      from: schedule.period === "last7" ? shiftDate(date, -6) : schedule.period === "month" ? date.slice(0, 7) + "-01" : undefined };
   }
   return null;
 }

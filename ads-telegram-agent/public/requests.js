@@ -4,7 +4,8 @@ function requestDraft() {
     phrases: $("reqPhrases").value.split(/\n/).map(s => s.trim()).filter(Boolean),
     groupMode: $("reqGroupMode").value, groupIds: $("reqGroupMode").value === "selected"
       ? [...$("reqGroups").querySelectorAll("input:checked")].map(i => i.value) : [],
-    reportDay: $("reqReportDay").value, format: $("reqFormat").value,
+    reportDay: $("reqReportDay").value === "yesterday" ? "yesterday" : "today",
+    ...(!["today","yesterday"].includes($("reqReportDay").value)?{period:$("reqReportDay").value}:{}), format: $("reqFormat").value,
     allowDate: $("reqAllowDate").checked, enabled: $("reqEnabled").checked };
 }
 function setupRequests(data) {
@@ -38,7 +39,7 @@ function fillRequest(rule) {
     input.type = "checkbox"; input.value = group.id; input.checked = rule?.groupIds.includes(group.id) || false;
     label.append(input, document.createTextNode(group.name)); return label;
   }));
-  $("reqReportDay").value = rule?.reportDay || "today"; $("reqFormat").value = rule?.format || "detailed";
+  $("reqReportDay").value = rule?.period || rule?.reportDay || "today"; $("reqFormat").value = rule?.format || "detailed";
   $("reqAllowDate").checked = rule?.allowDate ?? true; $("reqEnabled").checked = rule?.enabled ?? true;
   $("reqTestMessage").value = rule ? "/" + rule.command : "";
   $("requestFields").disabled = !state.canEditGroups;
@@ -91,7 +92,7 @@ document.getElementById("requestTestForm").onsubmit = async event => {
   const message = $("reqTestMessage").value.trim(), version = ++requestPreviewVersion;
   $("testRequest").disabled = true;
   $("requestConversation").replaceChildren(el("p", message, "chatUser"));
-  feedback("requestTestFeedback", "Đang đọc Google Sheets…");
+  feedback("requestTestFeedback", "Đang đọc nguồn và tính báo cáo…");
   try {
     const result = await api("request-preview", { request: requestDraft(), message });
     if (version !== requestPreviewVersion) return;

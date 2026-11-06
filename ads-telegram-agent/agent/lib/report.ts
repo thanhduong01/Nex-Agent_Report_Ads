@@ -14,6 +14,7 @@ export type Row = {
   costPerPhone: number | null;
   phoneRate: number | null;
   issues: string[];
+  metrics?: Record<string, number | null>;
 };
 
 export function validateDate(date: string): string {
@@ -124,6 +125,14 @@ export type Report = {
   totals: ReturnType<typeof aggregate>;
   previous: ReturnType<typeof aggregate> | null;
   previous7: ReturnType<typeof aggregate> | null;
+  range?: { from: string; to: string };
+  currency?: string;
+  timeZone?: string;
+  sourceKind?: string;
+  metricValues?: import("./report-service.ts").MetricResult[];
+  rowMetricValues?: { name: string; metrics: import("./report-service.ts").MetricResult[] }[];
+  comparisonValues?: import("./report-service.ts").MetricResult[];
+  customText?: string;
 };
 
 export function buildReport(date: string, byMonth: Record<string, Tables>, source: Source, now = new Date(), readRows = dayRows): Report {
@@ -153,6 +162,7 @@ const metric = (x: { value: number; complete: boolean; known: number }, currency
   x.known === 0 ? "chưa có dữ liệu" : `${currency ? money(x.value) : fmt(x.value)}${x.complete ? "" : " (dữ liệu một phần)"}`;
 
 export function renderReport(report: Report): string {
+  if (report.customText !== undefined) return report.customText;
   const { totals: t } = report;
   const trackedCount = report.rows.filter(r => r.tracksPhones).length;
   const lines = [

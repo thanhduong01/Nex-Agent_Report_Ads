@@ -37,7 +37,7 @@ async function graph(token:string,path:string,params:Record<string,string>={}) {
       body=JSON.parse(text);
     }catch{throw new GroupError("Meta: phản hồi không hợp lệ hoặc quá lớn.",502);}
     if(!response.ok||body.error) {
-      const code=body.error?.code;
+      const code=typeof body.error?.code==="number"?body.error.code:undefined;
       console.warn("Meta API request rejected",{status:response.status,code:typeof code==="number"?code:null});
       if(code===190)throw new GroupError("Meta: token hết hạn hoặc không hợp lệ. Kết nối lại nguồn.",400);
       if(code===10||code===200)throw new GroupError("Meta: chưa có quyền đọc tài khoản hoặc chỉ số này.",403);
@@ -56,11 +56,16 @@ async function collection(token:string,path:string,params:Record<string,string>=
     if(!body.paging?.next)return rows;
     let next:URL;
     try{next=new URL(body.paging.next);}catch{throw new GroupError("Meta: đường dẫn phân trang không hợp lệ.",502);}
-    if(next.origin!=="https://graph.facebook.com"||next.username||next.password||next.pathname!=="/"+metaVersion+"/"+path)
+    const samePath=next.pathname==="/"+metaVersion+"/"+path;
+    const canonicalMe=path==="me/adaccounts"&&new RegExp("^/"+metaVersion.replace(".","\\.")+"/\\d+/adaccounts$").test(next.pathname);
+    if(next.origin!=="https://graph.facebook.com"||next.username||next.password||(!samePath&&!canonicalMe))
       throw new GroupError("Meta: từ chối đường dẫn phân trang ngoài phạm vi.",502);
     next.searchParams.delete("access_token");next.searchParams.delete("appsecret_proof");
     if(seen.has(next.toString()))throw new GroupError("Meta: phân trang lặp lại.",502);
-    seen.add(next.toString());query=Object.fromEntries(next.searchParams);
+    seen.add(next.toString());
+    const cursor=next.searchParams.get("after"),before=next.searchParams.get("before"),offset=next.searchParams.get("offset");
+    if(!cursor&&!before&&!(offset&&/^\d+$/.test(offset)))throw new GroupError("Meta: phản hồi phân trang thiếu con trỏ.",502);
+    query={...params,limit:"200",...(cursor?{after:cursor}:before?{before}:{offset:offset!})};
   }
   throw new GroupError("Meta: quá nhiều trang. Thu hẹp báo cáo.");
 }

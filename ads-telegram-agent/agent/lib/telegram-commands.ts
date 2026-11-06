@@ -1,4 +1,4 @@
-import { getRegistry, type ReportGroup, type Registry } from "./groups.ts";
+import { getRegistry, GroupError, type ReportGroup, type Registry } from "./groups.ts";
 import { deliverOnce, deliveryKey } from "./delivery.ts";
 import { effectiveSchedule, nextOccurrence } from "./schedule-config.ts";
 import { productionOrigin } from "./telegram-setup.ts";
@@ -7,6 +7,8 @@ import { groupsForRequest, requestReport } from "./request-actions.ts";
 import { recordTelegramTraffic } from "./telegram-traffic.ts";
 import { DeliveryError } from "./delivery.ts";
 import { APP_NAME } from "./brand.ts";
+import { recordReportRun } from "./report-history.ts";
+import { resolvePeriod } from "./report-period.ts";
 
 const normalize = (value: string) => value.normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/g, "d").toLowerCase().trim();
 export function parseReportCommand(text: string, now = new Date()) {
@@ -14,7 +16,7 @@ export function parseReportCommand(text: string, now = new Date()) {
   return resolved ? { date: resolved.date, group: resolved.group } : null;
 }
 export function selectGroups(groups: ReportGroup[], input: string) {
-  if (!input || ["all", "tat ca"].includes(normalize(input))) return groups.filter(g => Object.keys(g.sources).length);
+  if (!input || ["all", "tat ca"].includes(normalize(input))) return groups.filter(g => Object.keys(g.sources).length || (g.report && g.report.source !== "sheets"));
   const value = normalize(input);
   const found = groups.filter(g => g.id === input || normalize(g.name) === value);
   if (found.length !== 1) throw new Error("Không tìm thấy nhóm. Gõ /nhom rồi dùng đúng tên hoặc mã nhóm.");
@@ -61,11 +63,14 @@ export async function handleTelegramCommand(message: CommandMessage, onDelivery?
   if (typeof sentAt === "number" && sentAt < Date.now() / 1000 - 3600) return;
   const prefix = "command-" + message.messageId;
   const send = async (part: string, text: string) => {
+    let sent = false;
     const chunks = text.match(/[\s\S]{1,3900}/g) || [];
     for (const [index, chunk] of chunks.entries()) {
       const result = await deliverOnce(deliveryKey("telegram", prefix + "-" + part + "-" + index), chunk);
       onDelivery?.(result.status);
+      if (result.status === "sent") sent = true;
     }
+    return sent ? "sent" as const : "already-recorded" as const;
   };
   const command = message.text.trim().split(/\s/)[0].split("@")[0].toLowerCase();
   let registry: Registry;
@@ -73,7 +78,7 @@ export async function handleTelegramCommand(message: CommandMessage, onDelivery?
   catch { await send("config-error", "Chưa đọc được cấu hình yêu cầu. Thử lại sau hoặc kiểm tra trên web."); return; }
   const groups = registry.groups;
   const help = APP_NAME + " · YÊU CẦU ĐÃ CẤU HÌNH\n\n" + registry.requests.filter(r => r.enabled).map(r =>
-    `/${r.command} — ${r.name} (${r.reportDay === "today" ? "hôm nay" : "hôm qua"})` +
+    `/${r.command} — ${r.name} (${({last7:"7 ngày gần nhất",month:"tháng này",template:"theo mẫu",today:"hôm nay",yesterday:"hôm qua"})[r.period || r.reportDay]})` +
     (r.allowDate ? `\nVí dụ: /${r.command} 02/11/2026` : "") +
     (r.phrases.length ? "\nHoặc nhắn: " + r.phrases.join(" · ") : "")
   ).join("\n\n") + "\n\n/nhom — danh sách nhóm\n/lich — lịch gửi\n/help — hướng dẫn\nSố liệu hôm nay có thể chưa nhập đủ.";
@@ -89,7 +94,7 @@ export async function handleTelegramCommand(message: CommandMessage, onDelivery?
     const dayNames = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
     const lines = groups.map(g => {
       const s = effectiveSchedule(g); const next = nextOccurrence(s);
-      return `${g.name}: ${s.enabled ? s.time + " · " + s.days.map(d => dayNames[d]).join(", ") : "Tạm dừng"}\nBáo cáo ${s.reportDay === "today" ? "hôm nay" : "hôm qua"}` +
+      return `${g.name}: ${s.enabled ? s.time + " · " + s.days.map(d => dayNames[d]).join(", ") : "Tạm dừng"}\nBáo cáo ${s.period === "last7" ? "7 ngày gần nhất" : s.period === "month" ? "tháng này" : s.reportDay === "today" ? "hôm nay" : "hôm qua"}` +
         (next ? "\nLần tới: " + new Date(next).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" }) : "");
     });
     await send("schedule", APP_NAME + " · LỊCH GỬI · GIỜ VIỆT NAM\n\n" + lines.join("\n\n") + "\n\nChỉnh lịch: " + productionOrigin() + "/#settings"); return;
@@ -99,12 +104,17 @@ export async function handleTelegramCommand(message: CommandMessage, onDelivery?
   catch (error) { await send("group-error", (error as Error).message); return; }
   if (!selected.length) { await send("empty", "Chưa có nhóm nào được cấu hình nguồn. Thêm nguồn trong trang Kết nối."); return; }
   for (const group of selected) {
-    let text;
+    let text, sourceFailed = false;
     try {
-      text = await requestReport(parsed!.rule, parsed!.date, group.id);
-    } catch {
+      text = await requestReport(parsed!.rule, parsed!.date, group.id, {from:parsed!.from,
+        ...(parsed!.templatePeriod ? {period:group.report?.period || "today"} : {})});
+    } catch(error) {
+      sourceFailed = true;
       text = `Chưa đọc được báo cáo ${group.name} ngày ${parsed!.date}. Kiểm tra nguồn tháng, quyền chia sẻ và các cột trong trang Kết nối.`;
+      if(error instanceof GroupError) text += "\n" + error.message;
     }
-    await send(group.id, text);
+    const status=await send(group.id, text);
+    const range=resolvePeriod(parsed!.date,parsed!.templatePeriod ? group.report?.period || "today" : "today",parsed!.from);
+    await recordReportRun({groupId:group.id,groupName:group.name,from:range.from,to:range.to,source:group.report?.source||"sheets",status:sourceFailed?"failed":status,mode:"bot"});
   }
 }

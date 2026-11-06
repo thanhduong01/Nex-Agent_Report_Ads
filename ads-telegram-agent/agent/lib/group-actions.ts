@@ -27,7 +27,7 @@ export async function groupAction(path: string, body: Record<string, unknown>) {
     if (!parsed.success) throw new GroupError("Chọn giờ hợp lệ và ít nhất một ngày gửi trong tuần.");
     const schedule = parsed.data;
     const previous = effectiveSchedule(existing || { enabled: false });
-    const changed = !existing?.schedule || ["enabled", "time", "days", "reportDay"].some(key =>
+    const changed = !existing?.schedule || ["enabled", "time", "days", "reportDay", "period"].some(key =>
       JSON.stringify(schedule[key as keyof typeof schedule]) !== JSON.stringify(previous[key as keyof typeof previous]));
     candidate.schedule = { ...schedule, startAt: changed ? new Date().toISOString() : previous.startAt };
     candidate.enabled = schedule.enabled;
@@ -44,7 +44,7 @@ export async function groupAction(path: string, body: Record<string, unknown>) {
   if (typeof body.removeMonth === "string") delete candidate.sources[monthSchema.parse(body.removeMonth)];
   const parsed = groupSchema.safeParse(candidate);
   if (!parsed.success || !Number.isInteger(body.revision)) throw new GroupError("Kiểm tra tên nhóm và cấu hình nguồn.");
-  if (parsed.data.enabled && !Object.keys(parsed.data.sources).length) throw new GroupError("Thêm ít nhất một nguồn trước khi bật lịch cho nhóm.");
+  if (parsed.data.enabled && !Object.keys(parsed.data.sources).length && (!parsed.data.report || parsed.data.report.source === "sheets")) throw new GroupError("Thêm ít nhất một nguồn trước khi bật lịch cho nhóm.");
   await saveGroup(parsed.data, body.revision as number);
   return { saved: true };
 }

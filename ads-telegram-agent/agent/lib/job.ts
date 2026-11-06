@@ -1,11 +1,13 @@
 import { getRegistry } from "./groups.ts";
 import { generateText } from "ai";
 import { deliverOnce, deliveryKey } from "./delivery.ts";
-import { liveReport } from "./sheets.ts";
+import { configuredReport } from "./report-service.ts";
+import type { ReportOptions } from "./report-service.ts";
 import { renderReport } from "./report.ts";
 import type { Report } from "./report.ts";
 import { dueOccurrence, effectiveSchedule } from "./schedule-config.ts";
 import { APP_NAME } from "./brand.ts";
+import { recordReportRun } from "./report-history.ts";
 
 async function analysis(report: Report): Promise<string> {
   if (process.env.AI_ENABLED !== "true") return "";
@@ -20,11 +22,12 @@ async function analysis(report: Report): Promise<string> {
   } catch { return "Phần nhận xét AI tạm thời không khả dụng; số liệu vẫn được tính bằng công thức."; }
 }
 
-export async function prepareReport(date: string, groupId = "default") {
-  const report = await liveReport(date, groupId);
+export async function prepareReport(date: string, groupId = "default", options: ReportOptions = {}) {
+  const report = await configuredReport(date, groupId, options);
   let text = renderReport(report);
   const notes = await analysis(report);
   if (notes) text += `\n\nNhận xét AI:\n${notes}`;
+  if(text.length>4096)throw new Error("Báo cáo vượt giới hạn Telegram. Rút ngắn nội dung hoặc số chỉ số.");
   return { report, text };
 }
 
@@ -38,13 +41,16 @@ export async function scheduledReport(now = new Date(), groupId?: string) {
     const date = occurrence.reportDate;
     const kind = "scheduled-" + group.id + "-" + occurrence.key;
     try {
-      results.push({ groupId: group.id, ...await deliverOnce(deliveryKey(date, kind), async () => (await prepareReport(date, group.id)).text) });
+      const delivered=await deliverOnce(deliveryKey(date, kind), async () => (await prepareReport(date, group.id, {from: occurrence.from})).text);
+      results.push({ groupId: group.id, ...delivered });
+      if(delivered.status==="sent")await recordReportRun({groupId:group.id,groupName:group.name,from:occurrence.from||date,to:date,source:group.report?.source||"sheets",status:"sent",mode:"schedule"});
     } catch {
       try {
         await deliverOnce(deliveryKey(date, kind + "-error"),
           `⚠️ ${APP_NAME}\nChưa hoàn tất báo cáo ${group.name} ngày ${date}. Kiểm tra nguồn tháng, quyền đọc và lịch sử gửi trước khi chạy lại.`);
       } catch { /* Continue other report groups even when this group's notification fails. */ }
       results.push({ groupId: group.id, status: "failed" });
+      await recordReportRun({groupId:group.id,groupName:group.name,from:occurrence.from||date,to:date,source:group.report?.source||"sheets",status:"failed",mode:"schedule"});
     }
   }
   return results;

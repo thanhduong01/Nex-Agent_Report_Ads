@@ -47,13 +47,14 @@ function feedback(id, text = "", error = false) {
   const node = $(id); node.textContent = text; node.classList.toggle("error", error);
 }
 function route() {
-  const selected = ["#settings", "#requests"].includes(location.hash) ? location.hash.slice(1) : "report";
-  for (const [view, nav] of [["report", "navReport"], ["settings", "navSettings"], ["requests", "navRequests"]]) {
+  const selected = ["#settings", "#requests", "#sources", "#templates", "#history"].includes(location.hash) ? location.hash.slice(1) : "report";
+  for (const [view, nav] of [["report", "navReport"], ["settings", "navSettings"], ["requests", "navRequests"],["sources","navSources"],["templates","navTemplates"],["history","navHistory"]]) {
     $(view + "View").hidden = !access || view !== selected;
     if (view === selected) $(nav).setAttribute("aria-current", "page"); else $(nav).removeAttribute("aria-current");
   }
-  document.title = ({ settings: "Kết nối & lịch gửi", requests: "Yêu cầu bot", report: "Báo cáo quảng cáo" })[selected] + " · Nex Report Ads Performance";
+  document.title = ({ settings: "Kết nối & lịch gửi", requests: "Yêu cầu bot", report: "Báo cáo quảng cáo",sources:"Nguồn dữ liệu",templates:"Mẫu & chỉ số",history:"Lịch sử báo cáo" })[selected] + " · Nex Report Ads Performance";
   if (selected === "settings" && access && state) checkTelegram(false);
+  if (selected === "history" && access && state && typeof loadReportHistory === "function") loadReportHistory();
 }
 function updateState(data) {
   state = data;
@@ -76,18 +77,28 @@ function updateState(data) {
   setupGroups(data);
   setupRequests(data);
   setupTelegram(data);
+  if (typeof setupBuilder === "function") setupBuilder(data);
 }
-function summaryMetric(id, total, count) {
+function summaryMetric(id, total, count, currency = "VND") {
   const node = $(id); node.textContent = total.known ? nf.format(total.value) : "—";
-  if (id === "cost" && total.known) node.append(el("em", "₫"));
+  if (id === "cost" && total.known) node.append(el("em", currency === "VND" ? "₫" : currency));
   $(id + "Note").textContent = total.known + "/" + count + " sản phẩm đã nhập";
 }
 function showReport({ report }) {
   const { rows, totals } = report;
-  summaryMetric("cost", totals.cost, rows.length);
+  summaryMetric("cost", totals.cost, rows.length, report.currency || "VND");
   summaryMetric("messages", totals.messages, rows.length);
   summaryMetric("phones", totals.phones, rows.filter(row => row.tracksPhones).length);
-  const partial = [totals.cost, totals.messages, totals.phones].some(metric => !metric.complete);
+  const partial = report.metricValues ? report.metricValues.some(metric => metric.value === null) :
+    [totals.cost, totals.messages, ...(rows.some(row=>row.tracksPhones)?[totals.phones]:[])].some(metric => !metric.complete);
+  if ($("reportCustomMetrics")) {
+    $("legacyMetricGrid").hidden = !!report.metricValues;
+    $("reportCustomMetrics").hidden = !report.metricValues;
+    $("reportCustomMetrics").replaceChildren(...(report.metricValues||[]).map(metric=>{
+      const card=el("article",undefined,"customMetric"),value=metric.value===null?"Không tính được":new Intl.NumberFormat("vi-VN",{minimumFractionDigits:metric.decimals,maximumFractionDigits:metric.decimals}).format(metric.value)+(metric.unit==="currency"?" "+(report.currency||"VND"):metric.unit==="percent"?"%":"");
+      card.append(el("h3",metric.name),el("strong",value),el("small",metric.reason||metric.formula));return card;
+    }));
+  }
   $("quality").textContent = partial ? "Dữ liệu một phần" : (report.confirmed ? "Đã chốt dữ liệu" : "Đủ chỉ số · Chưa chốt");
   $("quality").className = "pill " + (partial ? "warn" : "good");
   $("rows").replaceChildren(...rows.map(row => {
@@ -95,7 +106,7 @@ function showReport({ report }) {
     label.scope = "row";
     const tag = el("span", productCodes[row.name] || "", "tag"); tag.setAttribute("aria-hidden", "true");
     name.append(tag, document.createTextNode(row.name)); label.append(name);
-    const cost = el("td", row.cost === null ? "—" : nf.format(row.cost) + " ₫", "moneyCol");
+    const cost = el("td", row.cost === null ? "—" : nf.format(row.cost) + " " + (!report.currency||report.currency==="VND"?"₫":report.currency), "moneyCol");
     if (row.cost !== null && totals.cost.value > 0) {
       const bar = el("progress"); bar.max = totals.cost.value; bar.value = row.cost;
       bar.setAttribute("aria-label", "Tỷ trọng chi phí đã nhập của " + row.name); cost.append(bar);
@@ -104,7 +115,7 @@ function showReport({ report }) {
     const phones = el("td", row.tracksPhones ? (row.phones === null ? "—" : nf.format(row.phones)) : "Không theo dõi", row.tracksPhones ? "" : "na");
     tr.append(label, cost, messages, phones); return tr;
   }));
-  $("tableNote").replaceChildren(document.createTextNode("Đọc lúc " + shortTime.format(new Date(report.fetchedAt)) + " · Dấu — là ô chưa có số liệu. "), external("Mở Google Sheets ↗", report.sourceUrl));
+  $("tableNote").replaceChildren(document.createTextNode("Đọc lúc " + shortTime.format(new Date(report.fetchedAt)) + " · Dấu — là ô chưa có số liệu. "), external(report.sourceKind && report.sourceKind!=="sheets"?"Mở Ads Manager ↗":"Mở Google Sheets ↗", report.sourceUrl));
 }
 async function loadReport() {
   const serial = ++requestNumber;
@@ -112,7 +123,7 @@ async function loadReport() {
   $("preview").disabled = true; current = undefined;
   for (const id of ["cost", "messages", "phones"]) { $(id).textContent = "—"; $(id + "Note").textContent = ""; }
   $("quality").textContent = "Đang đọc dữ liệu"; $("quality").className = "pill";
-  $("rows").replaceChildren(); $("tableNote").textContent = "Đang đọc Google Sheets…";
+  $("rows").replaceChildren(); $("tableNote").textContent = "Đang đọc nguồn báo cáo…";
   $("reload").disabled = true;
   try {
     if (!date || !$("date").validity.valid) throw new Error("Chọn một ngày báo cáo hợp lệ.");

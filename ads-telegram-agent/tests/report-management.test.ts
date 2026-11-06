@@ -1,0 +1,42 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { dashboardApi } from "../agent/lib/dashboard-api.ts";
+import { sessionCookie } from "../agent/lib/dashboard-auth.ts";
+
+test("new reporting endpoints enforce auth/CSRF and connect formulas, Meta templates and previews without secret leakage",async t=>{
+  const dir=await mkdtemp(join(tmpdir(),"report-api-")),keys=["REPORT_CONFIG_PATH","PRIVATE_CONFIG_DIR","BLOB_READ_WRITE_TOKEN","BLOB_STORE_ID","VERCEL","DASHBOARD_PASSWORD","REPORT_SOURCES_JSON"];
+  const old=Object.fromEntries(keys.map(key=>[key,process.env[key]])),original=globalThis.fetch;
+  t.after(async()=>{globalThis.fetch=original;for(const key of keys)if(old[key]===undefined)delete process.env[key];else process.env[key]=old[key];await rm(dir,{recursive:true,force:true});});
+  for(const key of keys)delete process.env[key];
+  process.env.REPORT_CONFIG_PATH=join(dir,"groups.json");process.env.PRIVATE_CONFIG_DIR=dir;process.env.DASHBOARD_PASSWORD="test-admin-password";
+  const token="synthetic_test_token_123456789012345";
+  let calls=0;
+  globalThis.fetch=async(input)=>{
+    calls++;const url=new URL(String(input));
+    if(url.pathname.endsWith("/me/adaccounts"))return Response.json({data:[{id:"act_1001",name:"Account",currency:"VND",timezone_name:"Asia/Ho_Chi_Minh"}]});
+    if(url.pathname.endsWith("/campaigns"))return Response.json({data:[{id:"2001",name:"Tour"}]});
+    if(url.pathname.endsWith("/insights"))return Response.json({data:[{campaign_id:"2001",campaign_name:"Tour",spend:"1000",impressions:"100",inline_link_clicks:"5",actions:[{action_type:"onsite_conversion.messaging_conversation_started_7d",value:"10"}]}]});
+    throw Error("Unexpected URL");
+  };
+  const origin="https://app.example",cookie=sessionCookie(new Request(origin)).split(";")[0];
+  const request=(path:string,body?:object,auth=true,source=origin)=>dashboardApi(new Request(origin+"/api/"+path,{method:body?"POST":"GET",headers:{"X-Tram-Ads":"1",...(auth?{Cookie:cookie}:{}),...(body?{"Content-Type":"application/json",Origin:source}:{})},...(body?{body:JSON.stringify(body)}:{})}));
+  assert.equal((await request("meta",{id:"main",name:"Meta",token},false)).status,401);assert.equal(calls,0);
+  assert.equal((await request("meta",{id:"main",name:"Meta",token},true,"https://evil.invalid")).status,403);assert.equal(calls,0);
+  let response=await request("meta",{id:"main",name:"Meta",token});assert.equal(response.status,200);assert(!JSON.stringify(await response.json()).includes(token));
+  response=await request("metric",{revision:0,metric:{id:"cp_custom",name:"CP",formula:"chi_phi / tin_nhan",unit:"currency",decimals:2,scope:"both"}});assert.equal(response.status,200);
+  response=await request("formula-preview",{formula:"chi_phi / tin_nhan",values:{chi_phi:300,tin_nhan:10}});assert.equal((await response.json()).result.value,30);
+  assert.equal((await request("formula-preview",{formula:"process.exit()",values:{}})).status,400);
+  const definition={source:"meta",connectionId:"main",accountId:"act_1001",campaignIds:["2001"],metrics:["cost","messages","cp_custom"],period:"today",comparison:"none",detail:"summary",constants:{},body:"{{ten_nhom}}\n{{chi_so}}"};
+  response=await request("report-definition",{groupId:"default",revision:1,definition});assert.equal(response.status,200);
+  assert.equal((await request("report-definition",{groupId:"default",revision:1,definition})).status,409);
+  response=await request("template-preview",{groupId:"default",definition,anchor:"2026-11-02"});
+  assert.equal(response.status,200);const preview=await response.json();assert.match(preview.text,/CP: 100,00 VND/);assert(!JSON.stringify(preview).includes(token));
+  response=await request("state");const state=await response.json();
+  assert.equal(state.groups[0].report.source,"meta");assert.equal(state.metaConnections[0].accounts[0].id,"act_1001");assert(!JSON.stringify(state).includes(token));
+  assert.equal((await request("metric",{revision:2,id:"cp_custom",remove:true})).status,400);
+  assert.equal((await request("meta",{id:"main",name:"Meta",remove:true})).status,400);
+  response=await request("report-history");assert.equal(response.status,200);assert.equal((await response.json()).runs[0].status,"preview");
+});

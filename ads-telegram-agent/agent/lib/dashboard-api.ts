@@ -9,6 +9,10 @@ import { validateDate, yesterday } from "./report.ts";
 import { connectTelegram, telegramConnection } from "./telegram-setup.ts";
 import { requestAction } from "./request-actions.ts";
 import { schedulerApi } from "./scheduler-api.ts";
+import { metaAction, metaCampaigns } from "./meta.ts";
+import { reportManagement } from "./report-management.ts";
+import { reportHistory, recordReportRun } from "./report-history.ts";
+import { limitAdminOperation } from "./admin-rate-limit.ts";
 
 export async function dashboardApi(request: Request) {
   const url = new URL(request.url);
@@ -38,6 +42,16 @@ export async function dashboardApi(request: Request) {
       return json(200, { ok: true }, { "Set-Cookie": sessionCookie(request) });
     }
     if (!authenticated(request)) return json(401, { code: "login", error: "Đăng nhập để xem báo cáo." });
+    if (isPost && url.pathname === "/api/meta") { limitAdminOperation("meta",10); return json(200,await metaAction(body)); }
+    if (isPost && url.pathname === "/api/meta-campaigns") {
+      limitAdminOperation("meta-campaigns");
+      if(typeof body.connectionId!=="string"||typeof body.accountId!=="string")return json(400,{error:"Chọn kết nối và tài khoản Meta."});
+      return json(200,{campaigns:await metaCampaigns(body.connectionId,body.accountId)});
+    }
+    if (isPost && ["/api/metric","/api/formula-preview","/api/report-definition","/api/template-preview"].includes(url.pathname)) {
+      limitAdminOperation(url.pathname);return json(200,await reportManagement(url.pathname,body));
+    }
+    if (!isPost && url.pathname === "/api/report-history") return json(200,{runs:await reportHistory()});
     if (isPost && ["/api/request", "/api/request-preview"].includes(url.pathname)) return json(200, await requestAction(url.pathname, body));
     if (!isPost && url.pathname === "/api/telegram-status") return json(200, await telegramConnection());
     if (isPost && url.pathname === "/api/telegram-connect") {
@@ -49,7 +63,8 @@ export async function dashboardApi(request: Request) {
     if (!isPost && url.pathname === "/api/state") return json(200, await dashboardState(true));
     if (!isPost && url.pathname === "/api/report") {
       const date = validateDate(url.searchParams.get("date") || yesterday());
-      const { report, text } = await prepareReport(date, url.searchParams.get("group") || "default");
+      const { report, text } = await prepareReport(date, url.searchParams.get("group") || "default", {from:url.searchParams.get("from") || undefined});
+      await recordReportRun({groupId:report.groupId||"default",groupName:report.groupName||"Báo cáo",from:report.range?.from||date,to:date,source:report.sourceKind||"sheets",status:"prepared",mode:"web"});
       const id = sign({ purpose: "preview", text, date, nonce: randomUUID(),
         destination: process.env.TELEGRAM_CHAT_ID || "", exp: Date.now() + 30 * 60000 });
       return json(200, { report, text, id });

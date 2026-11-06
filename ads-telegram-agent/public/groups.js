@@ -26,13 +26,13 @@ function updateGroupSchedule() {
   $("scheduleDays").textContent = (schedule?.days.length === 7 ? "Hằng ngày" : (schedule?.days || []).map(d => ["CN", "T2", "T3", "T4", "T5", "T6", "T7"][d]).join(", ")) + " · giờ Việt Nam";
   $("scheduleStatus").textContent = !schedule?.enabled ? "Nhóm này đang tạm dừng" : !state.canSend || state.scheduler?.telegramConnected === false ? "Cần kiểm tra kết nối Telegram"
     : state.scheduler?.healthy ? "Đã bật · GitHub Actions" : "Đã lưu lịch · Kiểm tra GitHub";
-  $("scheduleDetail").textContent = "Báo cáo " + (schedule?.reportDay === "today" ? "hôm nay · đang cập nhật." : "ngày hôm trước.");
+  $("scheduleDetail").textContent = "Báo cáo " + ({last7:"7 ngày gần nhất.",month:"tháng này."}[schedule?.period] || (schedule?.reportDay === "today" ? "hôm nay · đang cập nhật." : "ngày hôm trước."));
 }
 function fillGroup() {
   const group = currentGroup();
   const schedule = group?.schedule || { enabled: false, time: "09:00", days: [0, 1, 2, 3, 4, 5, 6], reportDay: "yesterday" };
   $("groupName").value = group?.name || ""; $("groupEnabled").checked = schedule.enabled;
-  $("groupTime").value = schedule.time; $("groupReportDay").value = schedule.reportDay;
+  $("groupTime").value = schedule.time; $("groupReportDay").value = schedule.period || schedule.reportDay;
   for (const input of document.querySelectorAll(".weekdays input")) input.checked = schedule.days.includes(Number(input.value));
   $("nextRun").textContent = group?.nextRun ? "Lần gửi tiếp theo: " + new Date(group.nextRun).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" }) : "Lịch đang tắt. Chọn giờ và bật khi bạn sẵn sàng.";
   $("groupForm").querySelector("button").disabled = !state.canEditGroups;
@@ -66,7 +66,8 @@ function fillGroup() {
 }
 function groupPayload() {
   return { id: editingGroupId, name: $("groupName").value.trim(), enabled: $("groupEnabled").checked, revision: state.revision,
-    schedule: { enabled: $("groupEnabled").checked, time: $("groupTime").value, reportDay: $("groupReportDay").value,
+    schedule: { enabled: $("groupEnabled").checked, time: $("groupTime").value, reportDay: $("groupReportDay").value === "yesterday" ? "yesterday" : "today",
+      ...(["last7","month"].includes($("groupReportDay").value)?{period:$("groupReportDay").value}:{}),
       days: [...document.querySelectorAll(".weekdays input:checked")].map(input => Number(input.value)) } };
 }
 function columnName(index) {
