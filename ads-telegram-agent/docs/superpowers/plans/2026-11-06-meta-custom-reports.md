@@ -52,5 +52,5 @@ Files: dashboard-api.ts, dashboard-state.ts, scripts/dashboard/server.ts, public
 ## Task 5: QA and deployment
 - [x] Run full typecheck, 63 tests and local production build; compiled native webhook integration passes with synthetic Meta data.
 - [x] Independent Test Master / Fullstack Guardian review of whole branch; material issues fixed with RED→GREEN regressions.
-- [ ] Update operating documentation, fast-forward main and push existing GitHub remote; verify Vercel deployment.
-- [ ] Verify production assets and Telegram baseline; report the exact live-Meta credential prerequisite if still missing.
+- [x] Update operating documentation, fast-forward main and push existing GitHub remote; Vercel deployment cda2417 succeeded.
+- [x] Production assets returned 200; protected endpoints rejected unauthenticated/CSRF requests. Native Telegram /help and /baocao 02/11/2026 returned live Sheets reports. Meta live data awaits a system-user token entered by the owner in Sources; browser visual verification remains unavailable because the browser tool reports disabled.
