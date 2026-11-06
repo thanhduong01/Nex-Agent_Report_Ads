@@ -184,7 +184,7 @@ Bot chỉ nhận lệnh từ đúng chat riêng và người gửi trùng `TELEG
 
 Mở **Yêu cầu bot → Tạo yêu cầu**, điền tên và lệnh không dấu, ví dụ `thuonghai` để dùng `/thuonghai`. Bạn có thể thêm tối đa 5 câu tương đương như “báo cáo Thượng Hải”, mỗi câu một dòng. Bot khớp nguyên câu, bỏ qua hoa thường, dấu tiếng Việt và khoảng trắng dư; không suy đoán ý từ câu tự do.
 
-Chọn tất cả nhóm hoặc một số nhóm, ngày mặc định hôm nay/hôm qua, cho phép chọn ngày kèm lệnh và kiểu trả lời chi tiết/tổng quan. Tắt yêu cầu để bot ngừng nhận cả lệnh lẫn các câu tương đương. `/start`, `/help`, `/nhom`, `/lich`, `/report`, `/homnay` dành cho hệ thống. Các lệnh và câu không được trùng giữa các yêu cầu.
+Chọn tất cả nhóm hoặc một số nhóm, ngày mặc định hôm nay/hôm qua, cho phép chọn ngày kèm lệnh và kiểu trả lời chi tiết/tổng quan. Tắt yêu cầu để bot ngừng nhận cả lệnh lẫn các câu tương đương. `/start`, `/help`, `/chatid`, `/nhom`, `/lich`, `/report`, `/homnay` dành cho hệ thống. Các lệnh và câu không được trùng giữa các yêu cầu.
 
 **Chạy thử** dùng cấu hình đang chỉnh và đọc Sheets thật, chỉ hiện phản hồi trên web. Có thể thử `/thuonghai 02/11/2026` hoặc câu đã đặt. Chọn nhóm kèm lệnh chỉ được thu hẹp trong các nhóm của yêu cầu. **Lưu yêu cầu** có hiệu lực cho tin nhắn tiếp theo, không cần deploy. Để cập nhật ngay menu gợi ý Telegram, vào Kết nối và bấm **Kết nối & cập nhật menu lệnh**; GitHub Actions cũng cập nhật menu định kỳ.
 
@@ -256,3 +256,5 @@ Nếu cần quay lại bản trước, tắt workflow **Report scheduler** trên
 ## Kiểm tra khi bot không phản hồi
 
 Trong Kết nối, ứng dụng xác minh token, địa chỉ webhook và quyền truy cập chat riêng bằng Telegram API. Liên kết “Mở @...” dẫn đến đúng bot của token đang triển khai. Sau khi gửi `/help`, bấm kiểm tra kết nối để đọc trạng thái lệnh gần nhất: chưa nhận, bị bỏ qua do chat/người gửi không khớp, đang xử lý, đã gửi, đã ghi nhận hoặc lỗi kho lịch sử/Telegram. Dữ liệu chẩn đoán chỉ lưu thời điểm, giai đoạn và mã nguyên nhân trong Blob riêng tư; không lưu nội dung tin, chat ID hoặc token. “Đã kết nối” xác nhận cấu hình webhook, không tự khẳng định một lệnh đã được trả lời.
+
+Để lấy đúng người nhận sau khi webhook đã kết nối, nhắn `/chatid` trong chat riêng với bot. Lệnh này chỉ trả ID của chính người nhắn, không đọc báo cáo hoặc tự đổi chủ sở hữu. Dùng số bot trả về cho `TELEGRAM_CHAT_ID`, lưu Production và redeploy. Không dùng phần số đứng trước dấu `:` trong bot token vì đó là ID của bot. `/help` và `/baocao` vẫn chỉ được xử lý cho đúng chủ sở hữu đã cấu hình.
