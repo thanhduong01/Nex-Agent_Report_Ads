@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { GroupError, getRegistry } from "./groups.ts";
+import { GroupError, getRegistry, hasGroupStorage } from "./groups.ts";
 import { readPrivate, updatePrivate } from "./private-store.ts";
 import { validateDate } from "./report.ts";
 
@@ -17,7 +17,10 @@ async function stored() {
   if(!parsed.success)throw new GroupError("Không đọc được cấu hình kết nối Meta đã lưu.",503);
   return parsed.data;
 }
-export async function listMetaConnections() {return (await stored()).map(safeConnection);}
+export async function listMetaConnections() {
+  if(process.env.VERCEL==="1"&&!hasGroupStorage())return [];
+  return (await stored()).map(safeConnection);
+}
 async function connection(id:string) {
   const value=(await stored()).find(item=>item.id===id);
   if(!value)throw new GroupError("Chưa có kết nối Meta này. Lưu hoặc chọn lại kết nối.");
@@ -70,6 +73,7 @@ async function collection(token:string,path:string,params:Record<string,string>=
   throw new GroupError("Meta: quá nhiều trang. Thu hẹp báo cáo.");
 }
 export async function metaAction(body:Record<string,unknown>) {
+  if(process.env.VERCEL==="1"&&!hasGroupStorage())throw new GroupError("Kết nối kho Vercel Blob riêng tư trước khi lưu nguồn Meta.",503);
   const base=z.object({id:connectionSchema.shape.id,name:connectionSchema.shape.name}).safeParse(body);
   if(!base.success)throw new GroupError("Nhập tên và mã kết nối Meta hợp lệ.");
   if(body.remove===true) {

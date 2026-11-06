@@ -18,7 +18,7 @@ export async function reportManagement(path:string,body:Record<string,unknown>) 
     const input=z.object({formula:z.string().min(1).max(512),values:z.record(z.string().regex(/^[a-z][a-z0-9_]{0,47}$/),z.number().finite().nullable()).refine(values=>Object.keys(values).length<=60),
       metric:metricSchema.optional(),parameters:parametersSchema.optional()}).safeParse(body);
     if(!input.success)throw new GroupError("Kiểm tra công thức và các biến chạy thử.");
-    const values={...registry.parameters,...input.data.parameters,...input.data.values};
+    const values={...(input.data.parameters??registry.parameters??{}),...input.data.values};
     try {
       if(input.data.metric) {
         const definitions=metricDefinitions({...registry,metrics:[...(registry.metrics||[]).filter(metric=>metric.id!==input.data.metric!.id),input.data.metric]});
@@ -47,6 +47,8 @@ export async function reportManagement(path:string,body:Record<string,unknown>) 
       const parsed=metricSchema.safeParse(body.metric);
       if(!parsed.success)throw new GroupError("Kiểm tra tên, mã, công thức, đơn vị và số chữ số.");
       const at=metrics.findIndex(metric=>metric.id===parsed.data.id);
+      if(typeof body.editingId==="string"&&body.editingId!==parsed.data.id)throw new GroupError("Không đổi mã của chỉ số đang sửa. Tạo chỉ số mới nếu cần mã khác.");
+      if(at>=0&&body.editingId!==parsed.data.id)throw new GroupError("Mã chỉ số đã tồn tại. Chọn chỉ số đã lưu để sửa.");
       if(at>=0)metrics[at]=parsed.data;else metrics.push(parsed.data);
     }
     if(metrics.length>25)throw new GroupError("Tối đa 25 chỉ số tự tính. Sửa chỉ số đã có hoặc gỡ chỉ số không dùng.");

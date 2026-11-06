@@ -16,13 +16,18 @@ test("Meta connections paginate accounts, keep secrets private and validate acco
     assert.equal(url.origin,"https://graph.facebook.com");
     assert.equal(url.searchParams.has("access_token"),false);
     assert.equal(new Headers(init?.headers).get("Authorization"),"Bearer "+token);
-    if(url.pathname.endsWith("/me/adaccounts"))return Response.json({data:[{id:"act_1001",name:"Test",currency:"VND",timezone_name:"Asia/Ho_Chi_Minh"}]});
+    if(url.pathname.endsWith("/me/adaccounts")) {
+      assert.equal(url.searchParams.get("fields"),"id,name,currency,timezone_name");
+      return url.searchParams.get("after")?Response.json({data:[{id:"act_1002",name:"Second",currency:"USD",timezone_name:"America/New_York"}]}):
+        Response.json({data:[{id:"act_1001",name:"Test",currency:"VND",timezone_name:"Asia/Ho_Chi_Minh"}],paging:{next:"https://graph.facebook.com/v26.0/12345/adaccounts?after=second&fields=ignored&access_token="+token}});
+    }
     if(url.pathname.endsWith("/campaigns"))return Response.json({data:[{id:"2001",name:"Campaign"}]});
     if(url.pathname.endsWith("/insights"))return Response.json({data:[{campaign_id:"2001",campaign_name:"Campaign",spend:"123",impressions:"1000",inline_link_clicks:"20",actions:[{action_type:"onsite_conversion.messaging_conversation_started_7d",value:"3"}]}]});
     throw Error("Unexpected request");
   };
   const saved=await metaAction({id:"test",name:"Test connection",token});
   assert(!JSON.stringify(saved).includes(token));
+  assert.equal(saved.connections[0].accounts.length,2);
   assert(!JSON.stringify(await listMetaConnections()).includes(token));
   assert.equal((await metaCampaigns("test","act_1001"))[0].id,"2001");
   await assert.rejects(metaCampaigns("test","act_9999"),/tài khoản/);

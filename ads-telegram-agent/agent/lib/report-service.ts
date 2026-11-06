@@ -6,17 +6,18 @@ import { aggregate, dayRows, ratio, shiftDate } from "./report.ts";
 import type { Row, Tables, Report } from "./report.ts";
 import type { Source } from "./config.ts";
 import { readMetaInsights } from "./meta.ts";
-import { defaultMetrics, reportDefinitionSchema } from "./report-definition.ts";
+import { defaultMetrics, reportDefinitionSchema, templateTextVariables, templateAliases } from "./report-definition.ts";
 import type { CustomMetric, ReportDefinition } from "./report-definition.ts";
 import { evaluateMetrics, validateMetrics } from "./formulas.ts";
 import { previousPeriod, resolvePeriod } from "./report-period.ts";
 import { APP_NAME } from "./brand.ts";
-export type MetricResult=CustomMetric & {value:number|null;reason?:string};
+export type MetricResult=CustomMetric & {value:number|null;reason?:string;untracked?:boolean};
 type Range={from:string;to:string};
 type Readers={sheets?:(source:Source)=>Promise<Tables>;meta?:typeof readMetaInsights};
 export type ReportOptions={from?:string;period?:ReportDefinition["period"];definition?:ReportDefinition;summary?:boolean};
 export const metricDefinitions=(registry:Registry)=>[...defaultMetrics,...(registry.metrics||[])];
 const sum=(values:(number|null)[])=>values.some(value=>value===null)?null:values.reduce<number>((total,value)=>total+value!,0);
+const hotel=(name:string)=>name.normalize("NFD").replace(/\p{M}/gu,"").toLocaleLowerCase("vi").trim()==="khach san";
 const makeRow=(name:string,cost:number|null,messages:number|null,phones:number|null,tracksPhones:boolean,issues:string[]=[],metrics?:Row["metrics"]):Row=>({
   name,cost,messages,phones,tracksPhones,issues,metrics,costPerMessage:ratio(cost,messages),
   costPerPhone:tracksPhones?ratio(cost,phones):null,phoneRate:tracksPhones?ratio(phones,messages):null,
@@ -33,10 +34,10 @@ export async function sheetsRange(group:ReportGroup,range:Range,reader=readSprea
   }
   const rows=[...collected].map(([name,values])=>{
     const complete=values.length===dates.length;
-    const tracks=values.some(row=>row.tracksPhones);
+    const tracks=!hotel(name)&&values.some(row=>row.tracksPhones);
     return makeRow(name,complete?sum(values.map(row=>row.cost)):null,complete?sum(values.map(row=>row.messages)):null,
-      complete&&values.every(row=>row.tracksPhones)?sum(values.map(row=>row.phones)):null,tracks,
-      [...new Set(values.flatMap(row=>row.issues)),...(!complete?["thiếu sản phẩm trong một phần khoảng ngày"]:[])]);
+      tracks&&complete&&values.every(row=>row.tracksPhones)?sum(values.map(row=>row.phones)):null,tracks,
+      [...new Set(values.flatMap(row=>row.issues.filter(issue=>tracks||!/SĐT/.test(issue)))),...(!complete?["thiếu sản phẩm trong một phần khoảng ngày"]:[])]);
   });
   return {rows,sourceUrl:"https://docs.google.com/spreadsheets/d/"+group.sources[range.to.slice(0,7)].spreadsheetId+"/edit"};
 }
@@ -52,7 +53,11 @@ function valuesFor(rows:Row[],constants:Record<string,number>):Record<string,num
 function results(rows:Row[],definitions:CustomMetric[],selected:string[],constants:Record<string,number>,scope:"total"|"row"):MetricResult[] {
   const calculated=evaluateMetrics(definitions,valuesFor(rows,constants));
   return selected.map(id=>definitions.find(metric=>metric.id===id)!).filter(metric=>metric.scope==="both"||metric.scope===scope)
-    .map(metric=>({...metric,...calculated[metric.id]}));
+    .map(metric=>{
+      const result=calculated[metric.id];
+      const untracked=!rows.some(row=>row.tracksPhones)&&result.value===null&&/so_dien_thoai|_co_sdt/.test(result.reason||"");
+      return {...metric,...result,...(untracked?{untracked:true,reason:"Không theo dõi SĐT."}:{})};
+    });
 }
 async function loadRange(group:ReportGroup,definition:ReportDefinition,range:Range,readers:Readers,cache:Map<string,Promise<Tables>>) {
   if(definition.source==="sheets") {
@@ -65,11 +70,11 @@ async function loadRange(group:ReportGroup,definition:ReportDefinition,range:Ran
     [key,sum(meta.rows.map(row=>row.metrics[key as keyof typeof row.metrics]))]));
   let phones:number|null=null,tracks=false;const issues:string[]=[];
   if(definition.source==="hybrid") {
-    tracks=!/^kh[aá]ch s[aạ]n$/iu.test(definition.phoneSheetName||"");
-    try {
+    tracks=!hotel(definition.phoneSheetName||"");
+    if(tracks) try {
       const sheet=await sheetsRange(group,range,readers.sheets,cache);
       const row=sheet.rows.find(row=>row.name===definition.phoneSheetName);
-      if(row){phones=row.phones;tracks=row.tracksPhones;issues.push(...row.issues.filter(issue=>/SĐT|sản phẩm/.test(issue)));}
+      if(row){tracks=row.tracksPhones&&!hotel(definition.phoneSheetName||"");phones=tracks?row.phones:null;issues.push(...row.issues.filter(issue=>/SĐT|sản phẩm/.test(issue)));}
       else issues.push("không tìm thấy sản phẩm Sheets để ghép SĐT");
     } catch {issues.push("chưa đọc được SĐT từ Sheets cho toàn khoảng ngày");}
   }
@@ -110,13 +115,15 @@ export async function createConfiguredReport(group:ReportGroup,registry:Registry
     metricValues:summary,rowMetricValues:current.breakdown.map(row=>({name:row.name,metrics:detail([row],definitions,definition.metrics,constants,"row")})),
     comparisonValues:previous?results(previous.rows,definitions,definition.metrics,constants,"total"):undefined};
 }
-const textVariables=["ten_nhom","ky_bao_cao","chi_so","chi_tiet","so_sanh","nguon","thoi_diem_doc","mui_gio"];
+const textVariables=templateTextVariables;
+const bodyAliases=templateAliases;
 function validateBody(body:string,definitions:CustomMetric[]) {
-  const allowed=new Set([...textVariables,...definitions.map(metric=>metric.id)]);
+  const allowed=new Set([...textVariables,...definitions.map(metric=>metric.id),...Object.entries(bodyAliases).filter(([,id])=>definitions.some(metric=>metric.id===id)).map(([alias])=>alias)]);
   for(const match of body.matchAll(/\{\{(.*?)\}\}/g))if(!allowed.has(match[1].trim()))throw new Error("Mẫu có biến không tồn tại: "+match[1].trim()+".");
   if(body.replace(/\{\{[^{}]*\}\}/g,"").includes("{{")||body.replace(/\{\{[^{}]*\}\}/g,"").includes("}}"))throw new Error("Mẫu có placeholder chưa đóng đúng.");
 }
 export function formatMetric(metric:MetricResult,currency="VND") {
+  if(metric.untracked)return "Không theo dõi";
   if(metric.value===null)return "Không tính được";
   const value=new Intl.NumberFormat("vi-VN",{minimumFractionDigits:metric.decimals,maximumFractionDigits:metric.decimals}).format(metric.value);
   return value+(metric.unit==="currency"?" "+currency:metric.unit==="percent"?"%":"");
@@ -126,13 +133,14 @@ export function renderConfiguredReport(report:Report,definition:ReportDefinition
   validateBody(definition.body,metrics);
   const values:Record<string,string>=Object.create(null);
   for(const metric of metrics)values[metric.id]=formatMetric(metric,report.currency);
+  for(const [alias,id] of Object.entries(bodyAliases))if(Object.hasOwn(values,id))values[alias]=values[id];
   values.ten_nhom=report.groupName||"Báo cáo";
   const date=(value:string)=>value.split("-").reverse().join("/");
   values.ky_bao_cao=report.range&&report.range.from!==report.range.to?date(report.range.from)+" – "+date(report.range.to):date(report.date);
-  values.chi_so=metrics.map(metric=>metric.name+": "+formatMetric(metric,report.currency)+(metric.value===null?" ("+(metric.reason||"Thiếu số liệu")+")":"")).join("\n");
+  values.chi_so=metrics.map(metric=>metric.name+": "+formatMetric(metric,report.currency)+(metric.value===null&&!metric.untracked?" ("+(metric.reason||"Thiếu số liệu")+")":"")).join("\n");
   values.chi_tiet=definition.detail==="rows"?(report.rowMetricValues||[]).map(row=>
     row.name+"\n"+row.metrics.map(metric=>metric.name+": "+formatMetric(metric,report.currency)).join(" · ")).join("\n\n"):"";
-  values.so_sanh=definition.comparison==="none"?"":metrics.map(metric=>{
+  values.so_sanh=definition.comparison==="none"?"":metrics.filter(metric=>!metric.untracked).map(metric=>{
     const old=report.comparisonValues?.find(item=>item.id===metric.id);
     return metric.name+": "+(metric.value===null||!old||old.value===null||old.value===0?"chưa đủ dữ liệu so sánh":
       ((metric.value/old.value-1)*100).toLocaleString("vi-VN",{maximumFractionDigits:1,signDisplay:"always"})+"% so với kỳ trước");

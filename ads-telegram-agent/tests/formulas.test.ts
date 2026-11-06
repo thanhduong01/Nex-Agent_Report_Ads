@@ -29,5 +29,7 @@ test("unsafe syntax, unknown names, prototype names, cycles and excessive work a
   assert.throws(()=>validateMetrics([{id:"a",formula:"missing + 1"}]),/không tồn tại/);
   assert.throws(()=>validateMetrics([{id:"a",formula:"b"},{id:"b",formula:"a"}]),/vòng/);
   assert.throws(()=>validateMetrics([{id:"chi_phi",formula:"1"}]),/trùng/);
+  assert.throws(()=>validateMetrics([{id:"nguon",formula:"1"}]),/dành riêng/);
+  assert.throws(()=>validateMetrics([{id:"chi_phi_moi_tin_nhan",formula:"1"}]),/dành riêng/);
   assert.throws(()=>calculateFormula("1+".repeat(300)+"1",{}),/Công thức/);
 });

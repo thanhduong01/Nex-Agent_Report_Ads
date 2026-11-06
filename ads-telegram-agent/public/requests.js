@@ -17,7 +17,7 @@ function setupRequests(data) {
     button.setAttribute("aria-pressed", String(rule.id === editingRequestId));
     const top = el("span", undefined, "requestCardTop");
     top.append(el("code", "/" + rule.command), el("span", rule.enabled ? "Đang bật" : "Tạm tắt", "pill " + (rule.enabled ? "good" : "")));
-    button.append(top, el("strong", rule.name), el("small", (rule.groupMode === "all" ? "Tất cả nhóm" : rule.groupIds.length + " nhóm") + " · " + (rule.reportDay === "today" ? "Hôm nay" : "Hôm qua")));
+    button.append(top, el("strong", rule.name), el("small", (rule.groupMode === "all" ? "Tất cả nhóm" : rule.groupIds.length + " nhóm") + " · " + ({today:"Hôm nay",yesterday:"Hôm qua",last7:"7 ngày gần nhất",month:"Tháng này",template:"Theo từng mẫu"})[rule.period || rule.reportDay]));
     button.onclick = () => {
       if (requestDirty && !confirm("Bỏ thay đổi chưa lưu để mở yêu cầu khác?")) return;
       requestDirty = false; editingRequestId = rule.id; setupRequests(state);

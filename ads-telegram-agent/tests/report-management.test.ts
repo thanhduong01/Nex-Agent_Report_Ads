@@ -27,6 +27,8 @@ test("new reporting endpoints enforce auth/CSRF and connect formulas, Meta templ
   assert.equal((await request("meta",{id:"main",name:"Meta",token},true,"https://evil.invalid")).status,403);assert.equal(calls,0);
   let response=await request("meta",{id:"main",name:"Meta",token});assert.equal(response.status,200);assert(!JSON.stringify(await response.json()).includes(token));
   response=await request("metric",{revision:0,metric:{id:"cp_custom",name:"CP",formula:"chi_phi / tin_nhan",unit:"currency",decimals:2,scope:"both"}});assert.equal(response.status,200);
+  response=await request("metric",{revision:1,metric:{id:"cp_custom",name:"Accidental duplicate",formula:"1",unit:"currency",decimals:2,scope:"both"}});
+  assert.equal(response.status,400);assert.match((await response.json()).error,/đã tồn tại/);
   response=await request("formula-preview",{formula:"chi_phi / tin_nhan",values:{chi_phi:300,tin_nhan:10}});assert.equal((await response.json()).result.value,30);
   assert.equal((await request("formula-preview",{formula:"process.exit()",values:{}})).status,400);
   const definition={source:"meta",connectionId:"main",accountId:"act_1001",campaignIds:["2001"],metrics:["cost","messages","cp_custom"],period:"today",comparison:"none",detail:"summary",constants:{},body:"{{ten_nhom}}\n{{chi_so}}"};
@@ -38,5 +40,28 @@ test("new reporting endpoints enforce auth/CSRF and connect formulas, Meta templ
   assert.equal(state.groups[0].report.source,"meta");assert.equal(state.metaConnections[0].accounts[0].id,"act_1001");assert(!JSON.stringify(state).includes(token));
   assert.equal((await request("metric",{revision:2,id:"cp_custom",remove:true})).status,400);
   assert.equal((await request("meta",{id:"main",name:"Meta",remove:true})).status,400);
+  response=await request("metric",{revision:2,editingId:"cp_custom",metric:{id:"cp_custom",name:"CP cập nhật",formula:"chi_phi / tin_nhan",unit:"currency",decimals:2,scope:"both"}});
+  assert.equal(response.status,200);
+  response=await request("state");assert.equal((await response.json()).metrics[0].name,"CP cập nhật");
   response=await request("report-history");assert.equal(response.status,200);assert.equal((await response.json()).runs[0].status,"preview");
+  response=await request("metric",{revision:3,parameters:{fee:10}});assert.equal(response.status,200);
+  const feeMetric={id:"fee_result",name:"Fee result",formula:"chi_phi + fee",unit:"currency",decimals:0,scope:"total"};
+  response=await request("formula-preview",{formula:feeMetric.formula,metric:feeMetric,values:{chi_phi:100}});
+  assert.equal((await response.json()).result.value,110);
+  response=await request("formula-preview",{formula:feeMetric.formula,metric:feeMetric,values:{chi_phi:100},parameters:{}});
+  assert.equal(response.status,400);assert.match((await response.json()).error,/fee/);
+  assert.equal((await request("metric",{revision:4,metric:feeMetric,parameters:{}})).status,400);
+});
+test("legacy cloud dashboards without Blob keep working when Meta has not been connected",async t=>{
+  const keys=["VERCEL","BLOB_READ_WRITE_TOKEN","BLOB_STORE_ID","REPORT_SOURCES_JSON","DASHBOARD_PASSWORD"];
+  const old=Object.fromEntries(keys.map(key=>[key,process.env[key]]));
+  t.after(()=>{for(const key of keys)if(old[key]===undefined)delete process.env[key];else process.env[key]=old[key];});
+  for(const key of keys)delete process.env[key];
+  process.env.VERCEL="1";process.env.DASHBOARD_PASSWORD="test-password";
+  process.env.REPORT_SOURCES_JSON=JSON.stringify({"2026-11":{spreadsheetId:"legacy_fixture"}});
+  const origin="https://legacy.example",cookie=sessionCookie(new Request(origin)).split(";")[0];
+  const response=await dashboardApi(new Request(origin+"/api/state",{headers:{"X-Tram-Ads":"1",Cookie:cookie}}));
+  assert.equal(response.status,200);
+  const body=await response.json();assert.equal(body.groups[0].sources["2026-11"].spreadsheetId,"legacy_fixture");
+  assert.deepEqual(body.metaConnections,[]);
 });

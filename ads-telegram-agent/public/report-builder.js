@@ -1,6 +1,6 @@
 "use strict";
 let builderGroupId, builderDirty=false, metricDirty=false, metaEditingId, metricEditingId;
-let builderCampaigns=[], builderCampaignIds=[], builderMetricOrder=[], builderCampaignVersion=0, builderPreviewVersion=0;
+let builderCampaigns=[], builderCampaignIds=[], builderMetricOrder=[], builderCampaignVersion=0, builderPreviewVersion=0, formulaPreviewVersion=0;
 function builderParameters(text) {
   const result=Object.create(null);
   for(const line of text.split(/\n/).map(value=>value.trim()).filter(Boolean)) {
@@ -15,6 +15,7 @@ function builderParameters(text) {
 const builderParameterText=parameters=>Object.entries(parameters||{}).map(([key,value])=>key+" = "+value).join("\n");
 function builderMarkDirty() {
   builderDirty=true;builderPreviewVersion++;
+  $("tplPreview").disabled=false;
   $("templateSaveState").textContent="Chưa lưu";$("templateSaveState").className="pill warn";
   feedback("templatePreviewFeedback","Cấu hình đã đổi. Chạy thử lại để kiểm tra bản tin mới.");
 }
@@ -44,6 +45,12 @@ function setupBuilder(data) {
   builderSelect($("tplGroup"),data.groups,builderGroupId);
   $("templateFields").disabled=!data.canEditGroups||!builderGroupId;
   if(!builderDirty)fillBuilderGroup();
+  else {
+    const selectedConnection=$("tplConnection").value,selectedAccount=$("tplAccount").value;
+    builderSelect($("tplConnection"),data.metaConnections||[],selectedConnection,"Chọn kết nối");
+    builderMetricOrder=builderMetricOrder.filter(id=>(data.metricDefinitions||[]).some(metric=>metric.id===id));
+    builderAccounts(selectedAccount);renderBuilderChoices();
+  }
   const selectedMetric=metricEditingId||"";
   builderSelect($("metricSaved"),data.metrics||[],selectedMetric,"+ Chỉ số mới");
   if(!metricDirty)fillMetric();
@@ -88,7 +95,7 @@ function fillBuilderGroup() {
   $("tplReset").hidden=!definition;
   $("templatePreviewText").textContent="Chọn nguồn, chỉ số và chạy thử để xem báo cáo.";
   $("templatePreviewMetrics").replaceChildren();feedback("templateFeedback");feedback("templatePreviewFeedback");
-  builderPreviewVersion++;renderBuilderChoices();builderSourceFields();renderBuilderCampaigns();
+  builderPreviewVersion++;$("tplPreview").disabled=false;renderBuilderChoices();builderSourceFields();renderBuilderCampaigns();
 }
 function builderSourceFields() {
   const source=$("tplSource").value;
@@ -166,6 +173,7 @@ function builderTab(metric) {
   $("builderReportTab").setAttribute("aria-pressed",String(!metric));$("builderMetricsTab").setAttribute("aria-pressed",String(metric));
 }
 function fillMetric() {
+  formulaPreviewVersion++;$("formulaTest").disabled=false;
   metricEditingId=$("metricSaved").value||undefined;
   const metric=state.metrics?.find(item=>item.id===metricEditingId);
   $("metricName").value=metric?.name||"";$("metricId").value=metric?.id||"";$("metricId").disabled=!!metric;
@@ -180,6 +188,13 @@ function fillMetric() {
   }));
   const variables=[...Object.keys(state.baseVariables||{}),...Object.keys(state.parameters||{}),...(state.metrics||[]).filter(item=>item.id!==metricEditingId).map(item=>item.id)];
   $("formulaVariables").replaceChildren(...variables.map(name=>{const button=el("button",name,"variableButton");button.type="button";button.onclick=()=>builderInsert($("metricFormula"),name);return button;}));
+  validateMetricCode();
+}
+function validateMetricCode() {
+  const input=$("metricId"),id=input.value.trim();
+  const reserved=(state.reservedMetricIds||[]).includes(id);
+  const duplicate=!metricEditingId&&(state.metricDefinitions||[]).some(metric=>metric.id===id);
+  if(typeof input.setCustomValidity==="function")input.setCustomValidity(reserved?"Mã dành riêng cho nội dung mẫu. Chọn mã khác.":duplicate?"Mã chỉ số đã có. Chọn chỉ số đã lưu để sửa.":"");
 }
 function metricDraft() {
   return {id:$("metricId").value.trim(),name:$("metricName").value.trim(),formula:$("metricFormula").value.trim(),
@@ -250,7 +265,11 @@ document.getElementById("tplReset").onclick=async()=>{
 };
 document.getElementById("tplPreviewMode").onchange=()=>{
   const range=$("tplPreviewMode").value==="range";$("tplRangeBox").hidden=!range;$("tplAnchorBox").hidden=range;
-  $("tplAnchor").required=!range;$("tplFrom").required=range;$("tplTo").required=range;builderPreviewVersion++;
+  $("tplAnchor").required=!range;$("tplFrom").required=range;$("tplTo").required=range;builderPreviewVersion++;$("tplPreview").disabled=false;
+};
+document.getElementById("templatePreviewForm").oninput=()=>{
+  builderPreviewVersion++;$("tplPreview").disabled=false;
+  feedback("templatePreviewFeedback","Khoảng ngày đã đổi. Chạy thử lại để lấy đúng dữ liệu.");
 };
 document.getElementById("templatePreviewForm").onsubmit=async event=>{
   event.preventDefault();if(!$("templateForm").reportValidity())return;
@@ -260,21 +279,26 @@ document.getElementById("templatePreviewForm").onsubmit=async event=>{
     const result=await api("template-preview",{groupId:builderGroupId,name:$("tplName").value.trim(),definition:templateDraft(),...dates});
     if(version!==builderPreviewVersion)return;
     $("templatePreviewText").textContent=result.text;
-    $("templatePreviewMetrics").replaceChildren(...(result.report.metricValues||[]).filter(metric=>metric.value===null).map(metric=>el("p",metric.name+": "+metric.reason,"hint")));
+    $("templatePreviewMetrics").replaceChildren(...(result.report.metricValues||[]).filter(metric=>metric.value===null&&!metric.untracked).map(metric=>el("p",metric.name+": "+metric.reason,"hint")));
     feedback("templatePreviewFeedback","Đã đọc dữ liệu thật · "+result.text.length+"/4000 ký tự · Chưa gửi Telegram.");
   }catch(error){if(version===builderPreviewVersion)feedback("templatePreviewFeedback",error.message,true);}
-  finally{$("tplPreview").disabled=false;}
+  finally{if(version===builderPreviewVersion)$("tplPreview").disabled=false;}
 };
 document.getElementById("metricSaved").onchange=()=>{
   if(metricDirty&&!confirm("Bỏ thay đổi công thức chưa lưu?")){$("metricSaved").value=metricEditingId||"";return;}
   metricDirty=false;fillMetric();
 };
 document.getElementById("newMetric").onclick=()=>{if(metricDirty&&!confirm("Bỏ thay đổi công thức chưa lưu?"))return;metricDirty=false;$("metricSaved").value="";fillMetric();$("metricName").focus();};
-document.getElementById("metricForm").oninput=()=>{metricDirty=true;feedback("formulaResult","Công thức đã đổi. Tính thử lại để kiểm tra.");};
+function invalidateFormulaPreview() {
+  formulaPreviewVersion++;$("formulaTest").disabled=false;
+  feedback("formulaResult","Đầu vào đã đổi. Tính thử lại để kiểm tra.");
+}
+document.getElementById("metricForm").oninput=()=>{metricDirty=true;validateMetricCode();invalidateFormulaPreview();};
+document.getElementById("formulaTestValues").oninput=invalidateFormulaPreview;
 document.getElementById("metricForm").onsubmit=async event=>{
   event.preventDefault();$("metricSave").disabled=true;feedback("metricFeedback","Đang kiểm tra công thức và tham chiếu…");
   try {
-    const metric=metricDraft();await api("metric",{metric,parameters:builderParameters($("metricParameters").value),revision:state.revision});
+    const metric=metricDraft();await api("metric",{metric,editingId:metricEditingId,parameters:builderParameters($("metricParameters").value),revision:state.revision});
     metricDirty=false;metricEditingId=metric.id;updateState(await api("state"));
     feedback("metricFeedback","Đã lưu chỉ số. Chọn chỉ số này trong mẫu báo cáo để sử dụng.");
   }catch(error){feedback("metricFeedback",error.message,true);}finally{$("metricSave").disabled=!state.canEditGroups;}
@@ -287,13 +311,15 @@ document.getElementById("metricDelete").onclick=async()=>{
 };
 document.getElementById("formulaTest").onclick=async()=>{
   if(!$("metricForm").reportValidity())return;
+  const version=++formulaPreviewVersion;
   $("formulaTest").disabled=true;feedback("formulaResult","Đang tính thử…");
   try {
     const values=Object.fromEntries([...$("formulaTestValues").querySelectorAll("input")].map(input=>[input.dataset.variable,input.value===""?null:Number(input.value)]));
     const response=await api("formula-preview",{formula:$("metricFormula").value,metric:metricDraft(),values,parameters:builderParameters($("metricParameters").value)});
+    if(version!==formulaPreviewVersion)return;
     const result=response.result;
     feedback("formulaResult",result.value===null?"Không tính được · "+result.reason:new Intl.NumberFormat("vi-VN",{maximumFractionDigits:Number($("metricDecimals").value)}).format(result.value)+($("metricUnit").value==="percent"?"%":$("metricUnit").value==="currency"?" (đơn vị tiền của báo cáo)":""));
-  }catch(error){feedback("formulaResult",error.message,true);}finally{$("formulaTest").disabled=false;}
+  }catch(error){if(version===formulaPreviewVersion)feedback("formulaResult",error.message,true);}finally{if(version===formulaPreviewVersion)$("formulaTest").disabled=false;}
 };
 document.getElementById("reloadHistory").onclick=loadReportHistory;
 window.addEventListener("beforeunload",event=>{if(builderDirty||metricDirty){event.preventDefault();event.returnValue="";}});

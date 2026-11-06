@@ -1,9 +1,8 @@
 # Nex Report Ads Performance
 
-Agent đọc file Google Sheets theo tháng, tính chỉ số bằng code và gửi báo cáo
-ngày hôm trước lúc **09:00, Asia/Ho_Chi_Minh**. Phần nhận xét AI có thể bật thêm.
-Đây là mã nguồn đã chuẩn bị để kết nối và triển khai; chưa có credentials hoặc
-lịch chạy nào được kích hoạt trên cloud.
+Agent đọc Google Sheets theo tháng hoặc Meta Ads Insights, tính chỉ số bằng công thức đã cấu hình và gửi báo cáo qua Telegram. Mỗi nhóm có mẫu, lệnh và lịch riêng theo **Asia/Ho_Chi_Minh**. Phần nhận xét AI có thể bật thêm.
+
+Xem [hướng dẫn nguồn Meta, mẫu báo cáo và công thức](../README.md#meta-ads-mẫu-báo-cáo-và-chỉ-số-tự-tính). Kết nối Meta được cấu hình trên web, lưu riêng phía máy chủ và không trả token về dashboard.
 
 ## Mở bảng điều khiển Nex Report Ads Performance
 

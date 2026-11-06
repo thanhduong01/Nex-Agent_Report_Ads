@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "npm --prefix ads-telegram-agent ci",
+  "installCommand": "npm --prefix ads-telegram-agent ci --include=dev",
   "buildCommand": "node ads-telegram-agent/scripts/build-vercel.mjs",
   "outputDirectory": null
 }

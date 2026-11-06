@@ -34,6 +34,16 @@ test("templates reject unknown placeholders and produce plain text without evalu
   const result=await createConfiguredReport(group,registry,{from:"2026-11-01",to:"2026-11-02"},{sheets});
   assert.throws(()=>renderConfiguredReport(result,{...definition,body:"{{constructor}}"}),/biến|placeholder/i);
   assert.match(renderConfiguredReport(result,{...definition,body:"<b>{{ten_nhom}}</b>\n{{cp_custom}}"}),/<b>Tour<\/b>/);
+  assert.match(renderConfiguredReport(result,{...definition,body:"Chi phí: {{chi_phi}}"}),/Chi phí: 300 VND/);
+});
+test("hotel phone counts remain untracked in hybrid reports even when an imported mapping includes a phone column",async()=>{
+  const hotel={...group,report:reportDefinitionSchema.parse({...definition,source:"hybrid",connectionId:"meta",accountId:"act_1001",campaignIds:["2001"],phoneSheetName:"Khách Sạn",metrics:["phones","cost_per_phone"],comparison:"previous"})};
+  const sourceHotel={...source,mappings:source.mappings.map(mapping=>({...mapping,name:"Khách Sạn"}))};
+  hotel.sources={"2026-11":sourceHotel};
+  const meta=async()=>({currency:"VND",timeZone:"Asia/Ho_Chi_Minh",sourceUrl:"https://adsmanager.facebook.com",rows:[{id:"2001",name:"Hotel",cost:1000,messages:10,metrics:{hien_thi:100,nhap_lien_ket:2,lead:0,don_hang:0,doanh_thu:0}}]});
+  const result=await createConfiguredReport(hotel,registry,{from:"2026-11-01",to:"2026-11-02"},{sheets,meta});
+  assert.equal(result.rows[0].tracksPhones,false);assert.equal(result.metricValues?.find(metric=>metric.id==="phones")?.value,null);
+  assert.doesNotMatch(renderConfiguredReport(result,hotel.report!),/chưa đủ dữ liệu so sánh|chưa đọc được SĐT/);
 });
 test("periods and command date ranges validate leap dates and enforce inclusive bounds",()=>{
   assert.deepEqual(resolvePeriod("2026-11-06","last7"),{from:"2026-10-31",to:"2026-11-06"});

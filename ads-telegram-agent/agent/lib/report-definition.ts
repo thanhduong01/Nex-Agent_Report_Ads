@@ -1,9 +1,12 @@
 import { z } from "zod";
 export const identifier=z.string().regex(/^[a-z][a-z0-9_]{0,47}$/);
+export const templateTextVariables=["ten_nhom","ky_bao_cao","chi_so","chi_tiet","so_sanh","nguon","thoi_diem_doc","mui_gio"];
+export const templateAliases:Record<string,string>={chi_phi:"cost",tin_nhan:"messages",so_dien_thoai:"phones",chi_phi_moi_tin_nhan:"cost_per_message",chi_phi_moi_sdt:"cost_per_phone"};
+export const reservedMetricIds=[...templateTextVariables,...Object.keys(templateAliases)];
 export const parametersSchema=z.record(identifier,z.number().finite().min(-1e12).max(1e12))
   .refine(value=>Object.keys(value).length<=20);
 export const metricSchema=z.object({
-  id:identifier,name:z.string().trim().min(1).max(80),formula:z.string().trim().min(1).max(512),
+  id:identifier.refine(id=>!reservedMetricIds.includes(id),{message:"Mã chỉ số dành riêng cho nội dung mẫu."}),name:z.string().trim().min(1).max(80),formula:z.string().trim().min(1).max(512),
   unit:z.enum(["number","currency","percent"]),decimals:z.number().int().min(0).max(6),
   scope:z.enum(["total","row","both"]).default("both"),
 });

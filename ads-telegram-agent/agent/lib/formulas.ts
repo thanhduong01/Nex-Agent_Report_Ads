@@ -1,3 +1,4 @@
+import { reservedMetricIds } from "./report-definition.ts";
 export const baseVariables = {
   chi_phi: "Chi phí", tin_nhan: "Tin nhắn", so_dien_thoai: "SĐT",
   chi_phi_co_sdt: "Chi phí của sản phẩm có theo dõi SĐT",
@@ -114,6 +115,7 @@ export function validateMetrics(definitions:MetricExpression[], constants:string
   for(const definition of definitions) {
     if(!/^[a-z][a-z0-9_]{0,47}$/.test(definition.id)||forbidden.has(definition.id))fail("mã chỉ số chưa hợp lệ.");
     if(allowed.has(definition.id)||trees.has(definition.id))fail("mã chỉ số trùng biến hoặc chỉ số khác.");
+    if(reservedMetricIds.includes(definition.id))fail("mã chỉ số dành riêng cho nội dung mẫu.");
     trees.set(definition.id,parse(definition.formula));
   }
   const visiting=new Set<string>(),done=new Set<string>();

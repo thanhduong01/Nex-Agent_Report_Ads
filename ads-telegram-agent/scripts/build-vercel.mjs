@@ -4,6 +4,18 @@ import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 
 const app = fileURLToPath(new URL("../", import.meta.url));
+// Test code must never inherit Production credentials or storage flags.
+const checkEnv = { CI: "1" };
+for (const key of ["PATH", "HOME", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "TZ", "SystemRoot"])
+  if (process.env[key] !== undefined) checkEnv[key] = process.env[key];
+for (const args of [["run", "typecheck"], ["test"]]) {
+  const check = spawnSync("npm", args, { cwd: app, stdio: "inherit", env: checkEnv });
+  if (check.error || check.status !== 0) process.exit(check.status || 1);
+}
+for (const file of ["app.js", "groups.js", "requests.js", "telegram.js", "report-builder.js"]) {
+  const check = spawnSync(process.execPath, ["--check", "public/" + file], { cwd: app, stdio: "inherit", env: checkEnv });
+  if (check.error || check.status !== 0) process.exit(check.status || 1);
+}
 const result = spawnSync("npm", ["run", "build"], {
   cwd: app, stdio: "inherit", env: { ...process.env, VERCEL: "1" },
 });
