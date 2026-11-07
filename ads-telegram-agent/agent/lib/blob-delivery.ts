@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { get, put } from "@vercel/blob";
 import type { DeliveryStore } from "./delivery.ts";
+import { isBlobConflict } from "./blob-errors.ts";
 
 type RecordState = { state: "pending" | "sent" | "failed" | "uncertain"; createdAt: string; updatedAt?: string; messageId?: number; fingerprint: string };
 export interface DeliveryRecords {
@@ -21,7 +22,7 @@ const records: DeliveryRecords = {
         abortSignal: AbortSignal.timeout(15000) });
       return true;
     } catch (error) {
-      if (error instanceof Error && /Precondition|AlreadyExists/.test(error.name)) return false;
+      if (isBlobConflict(error)) return false;
       throw new Error("Không ghi được lịch sử gửi vào kho lưu trữ.");
     }
   },

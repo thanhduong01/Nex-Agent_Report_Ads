@@ -3,6 +3,7 @@ import { readFile, mkdir, writeFile, rename } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { GroupError } from "./groups.ts";
+import { isBlobConflict, blobWriteFailure } from "./blob-errors.ts";
 
 function paths(name:string) {
   if(!/^[a-z0-9-]{1,64}$/.test(name))throw new GroupError("Không xác định được kho dữ liệu.");
@@ -40,9 +41,14 @@ export async function updatePrivate<T>(name:string,initial:T,change:(value:T)=>v
         }
         return value;
       } catch(error) {
-        if(error instanceof Error&&/Precondition|AlreadyExists/.test(error.name)&&attempt<2)continue;
+        if(isBlobConflict(error)) {
+          if(attempt<2)continue;
+          throw new GroupError("Cấu hình đang được cập nhật. Thử lại sau.",409);
+        }
         if(error instanceof GroupError)throw error;
-        throw new GroupError("Không xác nhận được thay đổi trong kho riêng tư. Tải lại để kiểm tra.",503);
+        const failure=blobWriteFailure(error);
+        console.warn("Private configuration write failed",{reason:failure.code});
+        throw new GroupError(failure.message,503);
       }
     }
     throw new GroupError("Cấu hình đang được cập nhật. Thử lại sau.",409);

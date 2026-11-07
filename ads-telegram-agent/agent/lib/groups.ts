@@ -4,6 +4,8 @@ import { get, put } from "@vercel/blob";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
+import { isBlobConflict, blobWriteFailure } from "./blob-errors.ts";
 import { scheduleSchema } from "./schedule-config.ts";
 import { defaultRequests, requestSchema } from "./request-config.ts";
 import { reportDefinitionSchema, metricSchema, parametersSchema } from "./report-definition.ts";
@@ -67,17 +69,28 @@ export async function updateRegistry(revision: number, change: (registry: Regist
   if (registry.revision !== revision) throw new GroupError("Cấu hình đã thay đổi ở một cửa sổ khác. Tải lại danh sách rồi lưu lại.", 409);
   change(registry);
   registry.revision++;
-  registrySchema.parse(registry);
-  const content = JSON.stringify(registry);
+  const validated = registrySchema.parse(registry);
+  const content = JSON.stringify(validated);
   if (hasGroupStorage()) {
     try {
       await put(blobPath(), content, { access: "private", addRandomSuffix: false,
         allowOverwrite: !!etag, ...(etag ? { ifMatch: etag } : {}),
         contentType: "application/json", abortSignal: AbortSignal.timeout(15000) });
     } catch (error) {
-      if (error instanceof Error && /Precondition|AlreadyExists/.test(error.name))
+      // A write may commit before its response is lost. The SDK retries with the
+      // old ETag, then reports a conflict. Confirm the exact intended revision
+      // and content before deciding whether the user's save actually failed.
+      let latest: Awaited<ReturnType<typeof readStored>> | undefined;
+      try { latest = await readStored(); } catch { /* keep the outcome unconfirmed */ }
+      if (latest && isDeepStrictEqual(latest.registry, validated)) {
+        console.info("Report configuration write confirmed by readback", { revision: validated.revision });
+        return latest.registry;
+      }
+      if (isBlobConflict(error) || (latest && latest.registry.revision !== revision))
         throw new GroupError("Cấu hình đã thay đổi. Tải lại danh sách rồi lưu lại.", 409);
-      throw new GroupError("Chưa xác nhận lưu được cấu hình. Tải lại danh sách để kiểm tra trước khi thử lại.", 503);
+      const failure = blobWriteFailure(error);
+      console.warn("Report configuration write failed", { reason: failure.code, revision });
+      throw new GroupError(failure.message, 503);
     }
   } else {
     if (cloud()) throw new GroupError("Cần kết nối kho cấu hình riêng tư cho project trên Vercel.", 503);
@@ -88,5 +101,5 @@ export async function updateRegistry(revision: number, change: (registry: Regist
     const temporary = path + "." + randomUUID();
     writeFileSync(temporary, content, { mode: 0o600 }); renameSync(temporary, path);
   }
-  return registry;
+  return validated;
 }
