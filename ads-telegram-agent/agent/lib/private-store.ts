@@ -1,9 +1,10 @@
-import { get, put } from "@vercel/blob";
+import { put } from "@vercel/blob";
 import { readFile, mkdir, writeFile, rename } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { GroupError } from "./groups.ts";
 import { isBlobConflict, blobWriteFailure } from "./blob-errors.ts";
+import { readBlobJson } from "./blob-json.ts";
 
 function paths(name:string) {
   if(!/^[a-z0-9-]{1,64}$/.test(name))throw new GroupError("Không xác định được kho dữ liệu.");
@@ -11,11 +12,11 @@ function paths(name:string) {
     local:join(process.env.PRIVATE_CONFIG_DIR || dirname(process.env.REPORT_CONFIG_PATH || join(process.cwd(),".data/report-groups.json")),name+".json")};
 }
 const blobStorage=()=>!!(process.env.BLOB_READ_WRITE_TOKEN||process.env.BLOB_STORE_ID);
-async function read<T>(name:string,initial:T):Promise<{value:T;etag?:string}> {
+async function read<T>(name:string,initial:T,forWrite=false):Promise<{value:T;etag?:string}> {
   const path=paths(name);
   if(blobStorage()) {
-    const result=await get(path.blob,{access:"private",useCache:false,abortSignal:AbortSignal.timeout(15000)});
-    return result?{value:await new Response(result.stream).json() as T,etag:result.blob.etag}:{value:structuredClone(initial)};
+    const result=await readBlobJson(path.blob,forWrite);
+    return result?{value:result.value as T,etag:result.etag}:{value:structuredClone(initial)};
   }
   if(process.env.VERCEL==="1")throw new GroupError("Chưa kết nối kho lưu riêng tư cho cấu hình.",503);
   try{return {value:JSON.parse(await readFile(path.local,"utf8")) as T};}
@@ -31,7 +32,7 @@ export async function updatePrivate<T>(name:string,initial:T,change:(value:T)=>v
   const pending=previous.catch(()=>{}).then(async()=>{
     for(let attempt=0;attempt<3;attempt++) {
       try {
-        const {value,etag}=await read(name,initial);change(value);const content=JSON.stringify(value),path=paths(name);
+        const {value,etag}=await read(name,initial,true);change(value);const content=JSON.stringify(value),path=paths(name);
         if(blobStorage())await put(path.blob,content,{access:"private",addRandomSuffix:false,allowOverwrite:!!etag,
           ...(etag?{ifMatch:etag}:{}),contentType:"application/json",abortSignal:AbortSignal.timeout(15000)});
         else {

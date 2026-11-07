@@ -69,8 +69,8 @@ export async function reportManagement(path:string,body:Record<string,unknown>) 
     throw new GroupError("Tên nhóm/mẫu báo cáo đã được sử dụng.");
   if(body.reset===true) {
     if(!Object.keys(group.sources).length)throw new GroupError("Thêm nguồn Sheets trước khi quay lại mẫu mặc định.");
-    await updateRegistry(revision(body),draft=>{delete draft.groups.find(item=>item.id===group.id)!.report;});
-    return {saved:true};
+    const saved=await updateRegistry(revision(body),draft=>{delete draft.groups.find(item=>item.id===group.id)!.report;});
+    return {saved:true,revision:saved.revision,group:saved.groups.find(item=>item.id===group.id)};
   }
   const definition=validateReportDefinition(body.definition,registry);
   if(path==="/api/report-definition") {
@@ -79,9 +79,9 @@ export async function reportManagement(path:string,body:Record<string,unknown>) 
       if(definition.campaignIds.some(id=>!campaigns.some(campaign=>campaign.id===id)))throw new GroupError("Campaign không thuộc tài khoản đã chọn.");
     }
     if(definition.source==="hybrid"&&!Object.keys(group.sources).length)throw new GroupError("Thêm nguồn Sheets cho nhóm trước khi ghép SĐT.");
-    await updateRegistry(revision(body),draft=>{const item=draft.groups.find(item=>item.id===group.id)!;item.report=definition;item.name=name;});
+    const saved=await updateRegistry(revision(body),draft=>{const item=draft.groups.find(item=>item.id===group.id)!;item.report=definition;item.name=name;});
     console.info("Report definition updated",{groupId:group.id,source:definition.source});
-    return {saved:true};
+    return {saved:true,revision:saved.revision,group:saved.groups.find(item=>item.id===group.id)};
   }
   if(path!=="/api/template-preview")throw new GroupError("Không tìm thấy thao tác.",404);
   let range;

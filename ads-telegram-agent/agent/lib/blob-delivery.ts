@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
-import { get, put } from "@vercel/blob";
+import { put } from "@vercel/blob";
 import type { DeliveryStore } from "./delivery.ts";
 import { isBlobConflict } from "./blob-errors.ts";
+import { readBlobJson } from "./blob-json.ts";
 
 type RecordState = { state: "pending" | "sent" | "failed" | "uncertain"; createdAt: string; updatedAt?: string; messageId?: number; fingerprint: string };
 export interface DeliveryRecords {
@@ -11,9 +12,9 @@ export interface DeliveryRecords {
 const path = (key: string) => `report-delivery/${process.env.VERCEL_ENV || "production"}/${createHash("sha256").update(key).digest("hex")}.json`;
 const records: DeliveryRecords = {
   async read(key) {
-    const result = await get(path(key), { access: "private", useCache: false, abortSignal: AbortSignal.timeout(15000) });
+    const result = await readBlobJson(path(key),true);
     if (!result) return null;
-    return { value: await new Response(result.stream).json() as RecordState, etag: result.blob.etag };
+    return { value: result.value as RecordState, etag: result.etag };
   },
   async write(key, value, etag) {
     try {

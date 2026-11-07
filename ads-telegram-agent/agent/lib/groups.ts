@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { sources, sourceSchema } from "./config.ts";
-import { get, put } from "@vercel/blob";
+import { put } from "@vercel/blob";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { isBlobConflict, blobWriteFailure } from "./blob-errors.ts";
+import { readBlobJson } from "./blob-json.ts";
 import { scheduleSchema } from "./schedule-config.ts";
 import { defaultRequests, requestSchema } from "./request-config.ts";
 import { reportDefinitionSchema, metricSchema, parametersSchema } from "./report-definition.ts";
@@ -35,16 +36,19 @@ export class GroupError extends Error {
   status: number;
   constructor(message: string, status = 400) { super(message); this.status = status; }
 }
-async function readStored(): Promise<{ registry: Registry; etag?: string }> {
+async function readStored(forWrite=false): Promise<{ registry: Registry; etag?: string }> {
   try {
     if (hasGroupStorage()) {
-      const result = await get(blobPath(), { access: "private", useCache: false, abortSignal: AbortSignal.timeout(15000) });
+      const result = await readBlobJson(blobPath(),forWrite);
       if (!result) return { registry: initial() };
-      return { registry: registrySchema.parse(await new Response(result.stream).json()), etag: result.blob.etag };
+      return { registry: registrySchema.parse(result.value), etag: result.etag };
     }
     if (!cloud() && existsSync(localPath())) return { registry: registrySchema.parse(JSON.parse(readFileSync(localPath(), "utf8"))) };
     return { registry: initial() };
-  } catch { throw new GroupError("Không đọc được danh sách nhóm đã lưu. Kiểm tra kho cấu hình rồi thử lại.", 503); }
+  } catch(error) {
+    if(forWrite&&isBlobConflict(error))throw new GroupError("Kho cấu hình đang được cập nhật. Giữ bản đang chỉnh và thử lưu lại.",409);
+    throw new GroupError("Không đọc được danh sách nhóm đã lưu. Kiểm tra kho cấu hình rồi thử lại.", 503);
+  }
 }
 export async function getRegistry() { return (await readStored()).registry; }
 export async function getGroup(id = "default") {
@@ -65,7 +69,7 @@ export async function saveGroup(input: unknown, revision: number) {
   });
 }
 export async function updateRegistry(revision: number, change: (registry: Registry) => void) {
-  const { registry, etag } = await readStored();
+  const { registry, etag } = await readStored(true);
   if (registry.revision !== revision) throw new GroupError("Cấu hình đã thay đổi ở một cửa sổ khác. Tải lại danh sách rồi lưu lại.", 409);
   change(registry);
   registry.revision++;

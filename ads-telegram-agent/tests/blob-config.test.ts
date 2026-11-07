@@ -23,15 +23,27 @@ async function fixture(t:any) {
   process.env.BLOB_READ_WRITE_TOKEN="vercel_blob_rw_fixture_synthetic";
   process.env.VERCEL_ENV="production";
   process.env.REPORT_SOURCES_JSON=JSON.stringify({"2026-11":{spreadsheetId:"synthetic_sheet"}});
-  const rows=new Map<string,{content:string;etag:string}>();let generation=0,writes=0,commits=0,failRead=false;
+  const rows=new Map<string,{content:string;etag:string}>();let generation=0,writes=0,commits=0,failRead=false,metadataReads=0;
+  let variantEtags=false,changeDuringSnapshot=false,unstableMetadata=false;
   const set=(path:string,value:unknown)=>rows.set(path,{content:JSON.stringify(value),etag:'"version-'+(++generation)+'"'});
   set(configPath,originalRegistry());
   type Behavior="normal"|"conflict"|"lost-reply"|"access"|"unknown"|"unreadable";
   let behavior:Behavior="normal";
   const server=createServer(async(req,res)=>{
+    const url=new URL(req.url!,"http://localhost");
+    if(req.method==="GET") {
+      metadataReads++;
+      const path=url.searchParams.get("url")!;
+      if(unstableMetadata&&rows.has(path))set(path,JSON.parse(rows.get(path)!.content));
+      const row=rows.get(path);
+      res.writeHead(row?200:404,{"Content-Type":"application/json"}).end(JSON.stringify(row?{
+        url:"https://fixture.private.blob.vercel-storage.com/"+path,pathname:path,etag:row.etag,
+        size:Buffer.byteLength(row.content),contentType:"application/json",uploadedAt:"2026-11-07T00:00:00Z"
+      }:{error:{code:"not_found"}}));return;
+    }
     writes++;
     assert.equal(req.method,"PUT");
-    const path=new URL(req.url!,"http://localhost").searchParams.get("pathname")!;
+    const path=url.searchParams.get("pathname")!;
     let content="";for await(const part of req)content+=part;
     const error=(status:number,code:string,message="synthetic_secret_must_not_escape")=>{
       res.writeHead(status,{"Content-Type":"application/json"}).end(JSON.stringify({error:{code,message}}));
@@ -42,6 +54,7 @@ async function fixture(t:any) {
     if(behavior==="conflict") {
       const value=JSON.parse(rows.get(path)!.content);
       if(path===configPath){value.revision++;value.groups[0].name="Edited elsewhere";}
+      else if(path.startsWith("report-delivery/"))value.state="pending";
       else value.count++;
       set(path,value);behavior="normal";return error(412,"precondition_failed");
     }
@@ -60,15 +73,20 @@ async function fixture(t:any) {
   mock.get("https://fixture.private.blob.vercel-storage.com").intercept({path:/./,method:"GET"}).reply(options=>{
     const url=new URL(options.path,"https://fixture.private.blob.vercel-storage.com");
     if(failRead)return {statusCode:503,data:""};
-    const row=rows.get(decodeURIComponent(url.pathname.slice(1)));
-    return row?{statusCode:200,data:row.content,responseOptions:{headers:{etag:row.etag,"content-type":"application/json"}}}:{statusCode:404,data:""};
+    const path=decodeURIComponent(url.pathname.slice(1));
+    if(changeDuringSnapshot&&metadataReads>0&&path===configPath) {
+      changeDuringSnapshot=false;const value=JSON.parse(rows.get(path)!.content);
+      value.revision++;value.groups[0].name="Edited during snapshot";set(path,value);
+    }
+    const row=rows.get(path);
+    return row?{statusCode:200,data:row.content,responseOptions:{headers:{etag:variantEtags?"W/"+row.etag:row.etag,"content-type":"application/json"}}}:{statusCode:404,data:""};
   }).persist();
   setGlobalDispatcher(mock);
   t.after(async()=>{
     setGlobalDispatcher(dispatcher);await mock.close();for(const key of keys)if(old[key]===undefined)delete process.env[key];else process.env[key]=old[key];
     server.closeAllConnections();server.close();await once(server,"close");
   });
-  return {set,rows,mode:(value:Behavior)=>{behavior=value;},stats:()=>({writes,commits}),
+  return {set,rows,mode:(value:Behavior)=>{behavior=value;},variantEtags:()=>{variantEtags=true;},changeDuringSnapshot:()=>{changeDuringSnapshot=true;},unstableMetadata:()=>{unstableMetadata=true;},stats:()=>({writes,commits,metadataReads}),
     save:(revision=7)=>reportManagement("/api/report-definition",{groupId:"default",name:"Saved report",definition,revision})};
 }
 
@@ -76,6 +94,21 @@ test("cloud report save persists selected fields with the installed Blob SDK",as
   const store=await fixture(t);assert.equal((await store.save()).saved,true);
   const registry=await getRegistry();assert.equal(registry.revision,8);assert.equal(registry.groups[0].name,"Saved report");
   assert.equal(registry.groups[0].report?.body,definition.body);assert.equal(store.stats().commits,1);
+});
+test("report saves use the authoritative write version when download ETags are weak",async t=>{
+  const store=await fixture(t);store.variantEtags();
+  assert.equal((await store.save()).saved,true);
+  assert.equal((await getRegistry()).revision,8);assert.equal(store.stats().commits,1);
+});
+test("a metadata/content race cannot overwrite the report that changed during the read",async t=>{
+  const store=await fixture(t);store.changeDuringSnapshot();
+  await assert.rejects(store.save(),error=>error instanceof GroupError&&error.status===409);
+  assert.equal((await getRegistry()).groups[0].name,"Edited during snapshot");assert.equal(store.stats().commits,0);
+});
+test("continuously changing metadata stops after bounded reads and never writes an unsafe snapshot",async t=>{
+  const store=await fixture(t);store.unstableMetadata();
+  await assert.rejects(store.save(),error=>error instanceof GroupError&&error.status===409);
+  assert.equal(store.stats().writes,0);assert(store.stats().metadataReads<10);
 });
 test("the first cloud report configuration can create its private registry",async t=>{
   const store=await fixture(t);store.rows.delete(configPath);
@@ -100,6 +133,16 @@ test("private configuration retries real Blob conflicts against the latest value
   assert.deepEqual(await updatePrivate("save-test",{count:0},value=>{value.count++;}),{count:3});
   assert.equal(JSON.parse(store.rows.get(path)!.content).count,3);
 });
+test("private settings and delivery completion can update files whose download validator is weak",async t=>{
+  const store=await fixture(t);store.variantEtags();store.set("report-private/production/save-test.json",{count:1});
+  assert.deepEqual(await updatePrivate("save-test",{count:0},value=>{value.count++;}),{count:2});
+  const key="weak-validator-delivery",path="report-delivery/production/"+createHash("sha256").update(key).digest("hex")+".json";
+  store.set(path,{state:"failed",fingerprint:"previous",createdAt:"2026-11-07T00:00:00Z"});
+  assert.equal(await blobDeliveryStore.claim(key,"synthetic report"),true);
+  await blobDeliveryStore.finish(key,"sent",123);
+  assert.equal(JSON.parse(store.rows.get(path)!.content).state,"sent");
+  assert.equal(JSON.parse(store.rows.get(path)!.content).messageId,123);
+});
 test("rejected writes explain the storage permission failure and never expose the upstream error",async t=>{
   const store=await fixture(t);store.mode("access");
   await assert.rejects(store.save(),error=>{
@@ -123,4 +166,5 @@ test("a real Blob delivery conflict cannot claim another sender's delivery",asyn
   const path="report-delivery/production/"+createHash("sha256").update(key).digest("hex")+".json";
   store.set(path,{state:"failed",fingerprint:"previous",createdAt:"2026-11-07T00:00:00Z"});store.mode("conflict");
   assert.equal(await blobDeliveryStore.claim(key,"synthetic report"),false);assert.equal(store.stats().commits,0);
+  assert.equal(JSON.parse(store.rows.get(path)!.content).state,"pending");
 });

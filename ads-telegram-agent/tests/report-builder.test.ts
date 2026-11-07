@@ -59,7 +59,9 @@ function client(handler?:(call:Call)=>Promise<any>){
     window:{addEventListener(){}},Event,console,Option:class extends Element{constructor(name:string,value:string){super("option");this.textContent=name;this.value=value;}},
     el:(tag:string,text?:string,cls?:string)=>{const node=new Element(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;},
     feedback:(id:string,text="",error=false)=>{$(id).textContent=text;$(id).attributes.error=String(error);},
-    api:async(path:string,body:any)=>{const call={path,body:body===undefined?undefined:JSON.parse(JSON.stringify(body))};calls.push(call);return handler?handler(call):path==="state"?data:{saved:true};},
+    api:async(path:string,body:any)=>{const call={path,body:body===undefined?undefined:JSON.parse(JSON.stringify(body))};calls.push(call);return handler?handler(call):path==="state"?data:path==="report-definition"?{
+      saved:true,revision:data.revision+1,group:{...data.groups.find(group=>group.id===body.groupId),name:body.name,report:body.definition}
+    }:{saved:true};},
     updateState:(next:any)=>{scope.state=next;vm.runInContext("setupBuilder(state)",scope);}
   });
   vm.runInContext(script,scope);vm.runInContext("setupBuilder(state)",scope);
@@ -83,6 +85,43 @@ test("builder source switches only require controls for the selected source and 
   assert.equal(saved.body.revision,7);assert.equal(saved.body.definition.constants.phi,25);
   assert.deepEqual(saved.body.definition.metrics,["messages","cost","cost_per_message"]);
   assert.equal(saved.body.definition.source,"sheets");assert.equal(saved.body.definition.connectionId,undefined);
+});
+test("template save refreshes unrelated revisions without discarding the draft or reading state after a committed save",async()=>{
+  const latest=fixture();latest.revision=8;
+  let committed=false;
+  const ui=client(async call=>{
+    if(call.path==="state") {assert(!committed,"A post-save refresh must not turn a committed save into an error");return latest;}
+    if(call.path==="report-definition") {committed=true;return {saved:true,revision:9,group:{...latest.groups[0],name:call.body.name,report:call.body.definition}};}
+    throw Error("Unexpected request");
+  });
+  ui.input("tplName","My draft");ui.input("tplBody","{{ten_nhom}} · {{chi_so}}");
+  await ui.submit("templateForm");
+  const saved=ui.calls.find(call=>call.path==="report-definition")!;
+  assert.equal(saved.body.revision,8);assert.equal(saved.body.name,"My draft");assert.equal(saved.body.definition.body,"{{ten_nhom}} · {{chi_so}}");
+  assert.equal(ui.run("state.revision"),9);assert.equal(ui.run("builderDirty"),false);
+  assert.match(ui.$("templateFeedback").textContent,/Đã lưu/);
+});
+test("a template changed by another editor is not overwritten and the user's draft stays in the form",async()=>{
+  const latest=fixture();latest.revision=8;latest.groups[0].name="Changed elsewhere";
+  const ui=client(async call=>{assert.equal(call.path,"state");return latest;});
+  ui.input("tplName","My unsaved report");ui.input("tplBody","Keep this draft");
+  await ui.submit("templateForm");
+  assert.equal(ui.calls.filter(call=>call.path==="report-definition").length,0);
+  assert.equal(ui.$("tplName").value,"My unsaved report");assert.equal(ui.$("tplBody").value,"Keep this draft");
+  assert.equal(ui.run("builderDirty"),true);assert.match(ui.$("templateFeedback").textContent,/nơi khác/);
+  assert.equal(ui.$("tplSave").disabled,false);
+});
+test("a pending template save locks its inputs and suppresses duplicate submissions",async()=>{
+  const latest=fixture();let release!:(value:any)=>void;
+  const pending=new Promise(resolve=>{release=resolve;});
+  const ui=client(async call=>call.path==="state"?pending:{saved:true,revision:8,group:{...latest.groups[0],name:call.body.name,report:call.body.definition}});
+  ui.input("tplName","Draft to save");
+  const saving=ui.submit("templateForm");
+  assert.equal(ui.$("templateFields").disabled,true);assert.equal(ui.$("tplGroup").disabled,true);
+  await ui.submit("templateForm");assert.equal(ui.calls.length,1);
+  release(latest);await saving;
+  assert.equal(ui.$("templateFields").disabled,false);assert.equal(ui.$("tplGroup").disabled,false);
+  assert.equal(ui.calls.filter(call=>call.path==="report-definition").length,1);
 });
 test("metric save and calculation submit exact formulas and preserve blank test operands as null",async()=>{
   const ui=client(async call=>call.path==="formula-preview"?{result:{value:null,reason:"Thiếu số liệu"}}:call.path==="state"?fixture():{saved:true});

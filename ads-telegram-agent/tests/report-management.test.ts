@@ -33,6 +33,7 @@ test("new reporting endpoints enforce auth/CSRF and connect formulas, Meta templ
   assert.equal((await request("formula-preview",{formula:"process.exit()",values:{}})).status,400);
   const definition={source:"meta",connectionId:"main",accountId:"act_1001",campaignIds:["2001"],metrics:["cost","messages","cp_custom"],period:"today",comparison:"none",detail:"summary",constants:{},body:"{{ten_nhom}}\n{{chi_so}}"};
   response=await request("report-definition",{groupId:"default",revision:1,definition});assert.equal(response.status,200);
+  const savedReport=await response.json();assert.equal(savedReport.revision,2);assert.equal(savedReport.group.id,"default");assert.equal(savedReport.group.report.source,"meta");
   assert.equal((await request("report-definition",{groupId:"default",revision:1,definition})).status,409);
   response=await request("template-preview",{groupId:"default",definition,anchor:"2026-11-02"});
   assert.equal(response.status,200);const preview=await response.json();assert.match(preview.text,/CP: 100,00 VND/);assert(!JSON.stringify(preview).includes(token));

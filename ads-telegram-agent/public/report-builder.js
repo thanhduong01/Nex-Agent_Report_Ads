@@ -1,5 +1,6 @@
 "use strict";
 let builderGroupId, builderDirty=false, metricDirty=false, metaEditingId, metricEditingId;
+let builderBase, builderSaving=false;
 let builderCampaigns=[], builderCampaignIds=[], builderMetricOrder=[], builderCampaignVersion=0, builderPreviewVersion=0, formulaPreviewVersion=0;
 function builderParameters(text) {
   const result=Object.create(null);
@@ -74,6 +75,7 @@ function builderAccountInfo() {
 }
 function fillBuilderGroup() {
   const group=state.groups.find(item=>item.id===builderGroupId),definition=group?.report;
+  builderBase=builderTemplateVersion(group);
   $("tplName").value=group?.name||"";
   $("tplSource").value=definition?.source||"sheets";
   builderSelect($("tplConnection"),state.metaConnections||[],definition?.connectionId,"Chọn kết nối");
@@ -250,12 +252,30 @@ document.getElementById("tplConnection").onchange=()=>{builderAccounts();builder
 document.getElementById("tplAccount").onchange=()=>{builderAccountInfo();builderCampaigns=[];builderCampaignIds=[];builderCampaignVersion++;$("tplLoadCampaigns").disabled=false;renderBuilderCampaigns();builderMarkDirty();};
 document.getElementById("tplLoadCampaigns").onclick=loadBuilderCampaigns;
 document.getElementById("tplCampaignSearch").oninput=renderBuilderCampaigns;
+function builderTemplateVersion(group) {
+  return JSON.stringify({name:group?.name,report:group?.report||null},(_key,value)=>
+    value&&typeof value==="object"&&!Array.isArray(value)?Object.fromEntries(Object.entries(value).sort(([a],[b])=>a<b?-1:a>b?1:0)):value);
+}
+function lockTemplateSave(locked) {
+  for(const id of ["templateFields","tplGroup","builderNewGroup","tplSave"])$(id).disabled=locked||!state.canEditGroups;
+  for(const id of ["builderReportTab","builderMetricsTab"])$(id).disabled=locked;
+}
 document.getElementById("templateForm").onsubmit=async event=>{
-  event.preventDefault();$("tplSave").disabled=true;feedback("templateFeedback","Đang kiểm tra và lưu mẫu…");
+  event.preventDefault();if(builderSaving)return;
+  builderSaving=true;builderDirty=true;lockTemplateSave(true);feedback("templateFeedback","Đang kiểm tra và lưu mẫu…");
   try {
-    const definition=templateDraft();await api("report-definition",{groupId:builderGroupId,name:$("tplName").value.trim(),definition,revision:state.revision});
-    builderDirty=false;updateState(await api("state"));feedback("templateFeedback","Đã lưu. Bot và lịch gửi dùng cấu hình mới ở lần chạy tiếp theo.");
-  }catch(error){feedback("templateFeedback",error.message,true);}finally{$("tplSave").disabled=!state.canEditGroups;}
+    const groupId=builderGroupId,name=$("tplName").value.trim(),definition=templateDraft();
+    const fresh=await api("state"),group=fresh.groups.find(item=>item.id===groupId);
+    if(!group)throw Error("Nhóm này đã bị gỡ. Nội dung đang chỉnh vẫn được giữ để bạn chuyển sang nhóm khác.");
+    if(builderTemplateVersion(group)!==builderBase)throw Error("Mẫu này đã được chỉnh ở nơi khác. Nội dung của bạn vẫn được giữ; đối chiếu với bản đã lưu trước khi lưu lại.");
+    // Refresh unrelated settings/revisions while setupBuilder keeps this draft.
+    updateState(fresh);lockTemplateSave(true);
+    const saved=await api("report-definition",{groupId,name,definition,revision:fresh.revision});
+    if(!saved.saved||!Number.isInteger(saved.revision)||saved.group?.id!==groupId)throw Error("Chưa nhận đủ xác nhận lưu. Giữ nội dung đang chỉnh và kiểm tra bản đã lưu.");
+    const groups=fresh.groups.map(item=>item.id===groupId?{...item,...saved.group}:item);
+    builderDirty=false;updateState({...fresh,groups,revision:saved.revision});
+    feedback("templateFeedback","Đã lưu. Bot và lịch gửi dùng cấu hình mới ở lần chạy tiếp theo.");
+  }catch(error){feedback("templateFeedback",error.message,true);}finally{builderSaving=false;lockTemplateSave(false);}
 };
 document.getElementById("tplReset").onclick=async()=>{
   if(!confirm("Bỏ cấu hình mẫu riêng và dùng báo cáo Sheets mặc định?"))return;
