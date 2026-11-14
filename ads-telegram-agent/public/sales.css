@@ -91,3 +91,14 @@ section, aside, form, fieldset, .sectionLine > *, .mappingGrid > * { min-width:0
  .salesTabs button { padding:10px 11px; font-size:13px; }
 }
 #posConnectionFields { margin:0; padding:0; border:0; min-width:0; }
+.catalogPicker { margin:14px 0; min-width:0; }
+.catalogPicker > label { margin:0 0 6px; font-size:13px; }
+.catalogPicker input { margin-bottom:8px; }
+.pickerRow { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:start; }
+.pickerRow select { width:100%; min-width:0; max-width:100%; margin:0; text-overflow:ellipsis; }
+.pickerRow button { min-height:44px; }
+.formulaOperators { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 20px; }
+.formulaOperators button { min-width:44px; min-height:44px; font-family:var(--numbers); }
+.valueMapEditor { margin:18px 0; }
+.valueMapEditor textarea { margin-top:8px; }
+@container (max-width:640px) { .pickerRow { grid-template-columns:minmax(0,1fr); } .pickerRow button { width:100%; } }

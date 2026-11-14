@@ -97,7 +97,7 @@ function showReport({ report }) {
     $("legacyMetricGrid").hidden = !!report.metricValues;
     $("reportCustomMetrics").hidden = !report.metricValues;
     $("reportCustomMetrics").replaceChildren(...(report.metricValues||[]).map(metric=>{
-      const card=el("article",undefined,"customMetric"),value=metric.untracked?"Không theo dõi":metric.value===null?"Không tính được":new Intl.NumberFormat("vi-VN",{minimumFractionDigits:metric.decimals,maximumFractionDigits:metric.decimals}).format(metric.value)+(metric.unit==="currency"?" "+(report.currency||"VND"):metric.unit==="percent"?"%":"");
+      const card=el("article",undefined,"customMetric"),value=metric.untracked?"Không theo dõi":metric.value===null?"Không tính được":metric.valueMap&&Object.hasOwn(metric.valueMap,String(metric.value))?metric.valueMap[String(metric.value)]:new Intl.NumberFormat("vi-VN",{minimumFractionDigits:metric.decimals,maximumFractionDigits:metric.decimals}).format(metric.value)+(metric.unit==="currency"?" "+(report.currency||"VND"):metric.unit==="percent"?"%":"");
       card.append(el("h3",metric.name),el("strong",value),el("small",metric.reason||metric.formula));return card;
     }));
   }

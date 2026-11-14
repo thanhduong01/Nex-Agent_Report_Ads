@@ -21,6 +21,7 @@ export async function groupAction(path: string, body: Record<string, unknown>) {
   }
   const registry = await getRegistry();
   const existing = registry.groups.find(g => g.id === body.id);
+  if(body.create===true&&existing)throw new GroupError("Mã nhóm mới đã tồn tại; nhóm cũ được giữ nguyên.",409);
   const candidate = { ...existing, id: body.id, name: body.name, enabled: body.enabled, sources: { ...existing?.sources } };
   if (body.schedule !== undefined) {
     const parsed = scheduleSchema.safeParse(body.schedule);

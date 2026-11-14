@@ -12,6 +12,7 @@ import { baseVariables } from "./formulas.ts";
 import { reservedMetricIds } from "./report-definition.ts";
 import {listPancakeConnections} from "./pancake/connections.ts";
 import {databaseConfigured} from "./pancake/database.ts";
+import {sourceFields,posStatusLabels} from "./source-catalog.ts";
 
 export async function dashboardState(cloud = false) {
   const paired = Boolean(process.env.TELEGRAM_BOT_TOKEN && /^[1-9]\d*$/.test(process.env.TELEGRAM_CHAT_ID || ""));
@@ -28,6 +29,7 @@ export async function dashboardState(cloud = false) {
     requests: registry.requests,
     metaConnections: await listMetaConnections(), metrics: registry.metrics || [], metricDefinitions:metricDefinitions(registry),
     parameters:registry.parameters || {}, baseVariables, reservedMetricIds,
+    sourceFields,posStatusLabels,
     pancakeConnections:await listPancakeConnections(),databaseConfigured:databaseConfigured(),
     scheduler: await readSchedulerStatus(),
     months: Object.entries(registry.groups.find(g => g.id === "default")?.sources || {}).sort(([a], [b]) => b.localeCompare(a)).map(([month, source]) =>

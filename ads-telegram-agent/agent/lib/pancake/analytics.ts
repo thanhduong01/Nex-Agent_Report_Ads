@@ -1,5 +1,6 @@
 import type {OrderFact,AdIdentity,CampaignSpend,SalesPolicy,SalesQuality,SalesReport,SalesProduct} from "./types.ts";
 import {moneyUnit} from "./normalize.ts";
+import {posMoneyFields,posStatusLabels} from "../source-catalog.ts";
 
 const confirmed=new Set([1,12,13,8,9,2,3,16,15]),delivered=new Set([3,16]);
 const ratio=(a:number|null,b:number|null)=>a===null||!b?null:a/b;
@@ -29,6 +30,24 @@ export function orderAmounts(order:OrderFact,policy:SalesPolicy) {
     return {line:l,units:l.quantity-l.returned,revenue:valid?rounded((net[index]!-allocation)*(l.quantity?(l.quantity-l.returned)/l.quantity:0),order.currency):null};
   }).filter(l=>l.units>0);
 }
+function cohortFields(cohort:OrderFact[],policy:SalesPolicy){
+  const eligible=cohort.filter(o=>(policy.basis==="delivered"?delivered:confirmed).has(o.status));
+  const statusCodes=[...new Set([...Object.keys(posStatusLabels),...cohort.map(o=>String(o.status))])];
+  const statusCounts=statusCodes.map(code=>({code,label:posStatusLabels[code]||"Trạng thái "+code,count:cohort.filter(o=>String(o.status)===code).length}));
+  const fields:Record<string,number|null>={
+    pos_all_orders:cohort.length,pos_delivered_orders:cohort.filter(o=>delivered.has(o.status)).length,
+    pos_cancelled_orders:cohort.filter(o=>o.status===6).length,pos_returning_orders:cohort.filter(o=>o.status===4).length,
+    pos_returned_orders:cohort.filter(o=>o.status===5).length,pos_partial_return_orders:cohort.filter(o=>o.status===15).length,
+    pos_returned_units:cohort.reduce((s,o)=>s+o.lines.reduce((s,l)=>s+l.returned,0),0),
+    pos_gift_units:eligible.reduce((s,o)=>s+o.lines.filter(l=>l.gift).reduce((s,l)=>s+l.quantity-l.returned,0),0),
+    pos_discount_total:sum(eligible.map(o=>o.discount)),
+    pos_product_count:new Set(eligible.flatMap(o=>o.lines.filter(l=>!l.gift&&l.quantity>l.returned).map(l=>l.productId))).size,
+    pos_variant_count:new Set(eligible.flatMap(o=>o.lines.filter(l=>!l.gift&&l.quantity>l.returned).map(l=>l.variationId))).size,
+    ...Object.fromEntries(statusCounts.map(s=>['pos_status_'+s.code,s.count])),
+    ...Object.fromEntries(posMoneyFields.map(f=>[f.id,sum(cohort.map(o=>o.amounts?.[f.id]??null))])),
+  };
+  return {fields,statusCounts};
+}
 export function analyzeSales(orders:OrderFact[],ads:AdIdentity[],spend:CampaignSpend[],policy:SalesPolicy,
   range:{from:string;to:string},quality:SalesQuality,now=new Date()):SalesReport {
   const start=Date.parse(range.from+"T00:00:00+07:00"),end=Math.min(Date.parse(range.to+"T23:59:59.999+07:00"),now.getTime());
@@ -38,14 +57,25 @@ export function analyzeSales(orders:OrderFact[],ads:AdIdentity[],spend:CampaignS
   const cutoff=Math.min(Date.parse(quality.completeThrough||""),Date.parse(quality.syncedAt||""));
   const stale=!Number.isFinite(cutoff)||now.getTime()-cutoff>policy.maximumStaleMinutes*60000;
   const warnings:string[]=[];
+  const cohort=orders.filter(o=>{const day=localDay(o.createdAt);return day>=range.from&&day<=range.to&&Date.parse(o.createdAt)<=end&&!o.removed&&!o.abandoned&&o.currency===quality.currency;});
+  const {fields,statusCounts}=cohortFields(cohort,policy);
   if(!complete)warnings.push("Chưa đồng bộ đầy đủ khoảng ngày đã chọn; chỉ số bán hàng chưa khả dụng.");
   if(stale)warnings.push("Dữ liệu Pancake chưa được cập nhật gần đây.");
   if(quality.timeZone!=="Asia/Ho_Chi_Minh")warnings.push("Múi giờ Meta và shop chưa đồng nhất; không tính CPA/ROAS.");
   const scopedSpend=[...spend];
   for(const ad of ads)if(!scopedSpend.some(c=>c.id===ad.campaignId))scopedSpend.push({id:ad.campaignId,name:ad.campaignName,cost:0,messages:0});
-  const campaigns=scopedSpend.map(c=>({...c,orders:complete?0:null,units:complete?0:null,revenue:complete?0:null,cpa:null as number|null,roas:null as number|null}));
+  const campaigns=scopedSpend.map(c=>({...c,metrics:{} as Record<string,number|null>,orders:complete?0:null,units:complete?0:null,revenue:complete?0:null,cpa:null as number|null,roas:null as number|null}));
   const byCampaign=new Map(campaigns.map(c=>[c.id,c]));
   const identities=new Map<string,AdIdentity[]>();for(const ad of ads)identities.set(ad.id,[...(identities.get(ad.id)||[]),ad]);
+  for(const campaign of campaigns){
+    const scoped=cohort.filter(order=>{
+      if(order.adId&&order.utmAdId&&order.adId!==order.utmAdId)return false;
+      const id=order.adId||(policy.allowUtmAdId?order.utmAdId:null),ads=id?identities.get(id):undefined;
+      return ads?.length===1&&ads[0].campaignId===campaign.id;
+    });
+    const values=cohortFields(scoped,policy).fields;values.pos_unmatched_orders=0;
+    campaign.metrics=Object.fromEntries(Object.entries(values).map(([key,value])=>[key,complete?value:null]));
+  }
   const products=new Map<string,SalesProduct>();
   const excluded={currency:0,status:0,abandoned:0},reasons:Record<string,number>={missing_id:0,ambiguous:0,out_of_scope:0};
   let matched=0,count=0,units=0,deliveredOrders=0;const revenues:(number|null)[]=[],matchedRevenues:(number|null)[]=[];
@@ -85,7 +115,9 @@ export function analyzeSales(orders:OrderFact[],ads:AdIdentity[],spend:CampaignS
   const mature=now.getTime()-Date.parse(range.to+"T23:59:59+07:00")>=policy.maturityHours*3600000;
   if(safe&&mature)for(const c of campaigns)if(c.orders!>=policy.minimumOrders&&c.cpa!==null&&c.cpa<=policy.targetCpa)
     signals.push({kind:"watch",title:c.name+": tín hiệu CPA tốt",detail:c.orders+" đơn đã đối soát, CPA "+Math.round(c.cpa)+" "+quality.currency+" thấp hơn mục tiêu. Chưa xác định độ phủ riêng campaign, biên lợi nhuận và độ trễ hoàn hàng để khuyến nghị ngân sách."});
+  fields.pos_unmatched_orders=count-matched;
   return {complete,quality:{...quality,stale,warnings},basis:policy.basis,
+    metrics:Object.fromEntries(Object.entries(fields).map(([k,v])=>[k,complete?v:null])),statusCounts:complete?statusCounts:[],
     totals:{orders:complete?count:null,units:complete?units:null,revenue:complete?sum(revenues):null,deliveredOrders:complete?deliveredOrders:null,
       matchedRevenue:complete?sum(matchedRevenues):null,spend:totalSpend,cpa:safe?ratio(totalSpend,matched):null,roas:safe?ratio(sum(matchedRevenues),totalSpend):null},
     attribution:{matchedOrders:matched,unmatchedOrders:count-matched,coverage,reasons},excluded,campaigns,products:complete?ranked:[],signals};

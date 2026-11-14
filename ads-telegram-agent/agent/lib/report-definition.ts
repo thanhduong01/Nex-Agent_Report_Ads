@@ -1,7 +1,8 @@
 import { z } from "zod";
 import {salesPolicySchema} from "./pancake/types.ts";
+import {sourceFieldMetrics} from "./source-catalog.ts";
 export const identifier=z.string().regex(/^[a-z][a-z0-9_]{0,47}$/);
-export const templateTextVariables=["ten_nhom","ky_bao_cao","chi_so","chi_tiet","so_sanh","nguon","thoi_diem_doc","mui_gio","san_pham_ban_chay","nhan_dinh","doi_soat"];
+export const templateTextVariables=["ten_nhom","ky_bao_cao","chi_so","chi_tiet","so_sanh","nguon","thoi_diem_doc","mui_gio","san_pham_ban_chay","nhan_dinh","doi_soat","TRANG_THAI_DON_HANG"];
 export const templateAliases:Record<string,string>={chi_phi:"cost",tin_nhan:"messages",so_dien_thoai:"phones",chi_phi_moi_tin_nhan:"cost_per_message",chi_phi_moi_sdt:"cost_per_phone"};
 export const reservedMetricIds=[...templateTextVariables,...Object.keys(templateAliases)];
 export const parametersSchema=z.record(identifier,z.number().finite().min(-1e12).max(1e12))
@@ -10,8 +11,9 @@ export const metricSchema=z.object({
   id:identifier.refine(id=>!reservedMetricIds.includes(id),{message:"Mã chỉ số dành riêng cho nội dung mẫu."}),name:z.string().trim().min(1).max(80),formula:z.string().trim().min(1).max(512),
   unit:z.enum(["number","currency","percent"]),decimals:z.number().int().min(0).max(6),
   scope:z.enum(["total","row","both"]).default("both"),
+  valueMap:z.record(z.string().regex(/^-?\d+(?:\.\d+)?$/).max(40),z.string().trim().min(1).max(100)).refine(map=>Object.keys(map).length<=50).optional(),
 });
-export type CustomMetric=z.infer<typeof metricSchema>;
+export type CustomMetric=z.infer<typeof metricSchema> & {provider?:"meta"|"pancake"};
 export const defaultMetrics:CustomMetric[]=[
   {id:"cost",name:"Chi phí",formula:"chi_phi",unit:"currency",decimals:0,scope:"both"},
   {id:"messages",name:"Tin nhắn",formula:"tin_nhan",unit:"number",decimals:0,scope:"both"},
@@ -32,6 +34,7 @@ export const defaultMetrics:CustomMetric[]=[
   {id:"pos_matched_orders",name:"Đơn nối đúng campaign",formula:"pos_don_khop",unit:"number",decimals:0,scope:"both"},
   {id:"pos_cpa",name:"CPA đơn Pancake",formula:"pos_cpa_an_toan",unit:"currency",decimals:0,scope:"both"},
   {id:"pos_roas",name:"ROAS Pancake",formula:"pos_roas_an_toan",unit:"number",decimals:2,scope:"both"},
+  ...sourceFieldMetrics,
 ];
 export const periodSchema=z.enum(["today","yesterday","last7","month"]);
 export const reportDefinitionSchema=z.object({
@@ -39,12 +42,13 @@ export const reportDefinitionSchema=z.object({
   pancakeConnectionId:z.string().regex(/^[a-z0-9-]{1,64}$/).optional(),
   shopId:z.string().regex(/^\d{1,30}$/).optional(),
   salesPolicy:salesPolicySchema.optional(),
+  statusLabels:z.record(z.string().regex(/^\d{1,3}$/),z.string().trim().min(1).max(80)).refine(map=>Object.keys(map).length<=30).optional(),
   connectionId:z.string().regex(/^[a-z0-9-]{1,64}$/).optional(),
   accountId:z.string().regex(/^act_\d{1,30}$/).optional(),
   campaignIds:z.array(z.string().regex(/^\d{1,30}$/)).max(100).default([]),
   messageAction:z.string().regex(/^[a-zA-Z0-9_.]{1,120}$/).default("onsite_conversion.messaging_conversation_started_7d"),
   phoneSheetName:z.string().trim().min(1).max(100).optional(),
-  metrics:z.array(identifier).min(1).max(30).refine(items=>new Set(items).size===items.length),
+  metrics:z.array(z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,63}$/)).min(1).max(60).refine(items=>new Set(items).size===items.length),
   period:periodSchema.default("today"),comparison:z.enum(["previous","none"]).default("previous"),
   detail:z.enum(["summary","rows"]).default("summary"),
   constants:parametersSchema.default({}),

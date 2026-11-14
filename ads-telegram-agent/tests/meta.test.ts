@@ -52,3 +52,16 @@ test("Meta client refuses off-origin pagination and never echoes upstream creden
   mode="error";
   await assert.rejects(metaAction({id:"test",name:"Test",token:secret}),error=>error instanceof Error&&/quyền|token/i.test(error.message)&&!error.message.includes(secret));
 });
+test('selected source fields use combined account totals rather than summing reach or API ratios',async t=>{
+ const dir=await mkdtemp(join(tmpdir(),'meta-catalog-')),previous=process.env.PRIVATE_CONFIG_DIR,original=globalThis.fetch;
+ process.env.PRIVATE_CONFIG_DIR=dir;t.after(async()=>{globalThis.fetch=original;if(previous===undefined)delete process.env.PRIVATE_CONFIG_DIR;else process.env.PRIVATE_CONFIG_DIR=previous;await rm(dir,{recursive:true,force:true});});
+ let combined=0;globalThis.fetch=async input=>{
+  const u=new URL(String(input));if(u.pathname.endsWith('/me/adaccounts'))return Response.json({data:[{id:'act_1001',name:'Account',currency:'VND',timezone_name:'Asia/Ho_Chi_Minh'}]});
+  if(u.pathname.endsWith('/campaigns'))return Response.json({data:[{id:'2001',name:'A'},{id:'2002',name:'B'}]});
+  if(u.searchParams.get('level')==='account'){combined++;assert(u.searchParams.get('filtering')?.includes('2001'));assert(u.searchParams.get('fields')?.includes('reach'));return Response.json({data:[{reach:'150',cpc:'3.5'}]});}
+  return Response.json({data:[{campaign_id:'2001',campaign_name:'A',spend:'100',impressions:'100',reach:'100',cpc:'2'},{campaign_id:'2002',campaign_name:'B',spend:'200',impressions:'200',reach:'100',cpc:'5'}]});
+ };
+ await metaAction({id:'test',name:'Test',token:'synthetic_private_token_1234567890'});
+ const result=await readMetaInsights({connectionId:'test',accountId:'act_1001',campaignIds:['2001','2002'],messageAction:'lead',variables:['meta_reach','meta_cpc']},{from:'2026-11-14',to:'2026-11-14'});
+ assert.equal(result.summaryMetrics?.meta_reach,150);assert.equal(result.summaryMetrics?.meta_cpc,3.5);assert.equal(result.rows[0].metrics.meta_reach,100);assert.equal(combined,1);
+});

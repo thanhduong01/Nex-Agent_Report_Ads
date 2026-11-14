@@ -1,6 +1,6 @@
 "use strict";
 let builderGroupId, builderDirty=false, metricDirty=false, metaEditingId, metricEditingId;
-let builderBase, builderSaving=false;
+let builderBase, builderSaving=false, builderCreating=false;
 let builderCampaigns=[], builderCampaignIds=[], builderMetricOrder=[], builderCampaignVersion=0, builderPreviewVersion=0, formulaPreviewVersion=0;
 function builderParameters(text) {
   const result=Object.create(null);
@@ -14,6 +14,32 @@ function builderParameters(text) {
   return result;
 }
 const builderParameterText=parameters=>Object.entries(parameters||{}).map(([key,value])=>key+" = "+value).join("\n");
+function builderValueMap(text,status=false){
+  const result=Object.create(null);
+  for(const line of text.split(/\n/).map(s=>s.trim()).filter(Boolean)){
+    const match=/^(-?\d+(?:\.\d+)?)\s*=\s*(.+)$/.exec(line);
+    if(!match||(status&&!/^\d{1,3}$/.test(match[1]))||match[2].length>(status?80:100))throw Error("Quy đổi mã: mỗi dòng dùng mã = nhãn hiển thị hợp lệ.");
+    if(Object.hasOwn(result,match[1]))throw Error("Mã quy đổi bị trùng: "+match[1]);result[match[1]]=match[2];
+  }
+  if(Object.keys(result).length>(status?30:50))throw Error("Quá nhiều mã quy đổi.");return result;
+}
+const builderMapText=map=>Object.entries(map||{}).map(([code,label])=>code+" = "+label).join("\n");
+function pickerOptions(select,items,query="",placeholder="Chọn một trường"){
+  const current=select.value,search=query.normalize('NFD').replace(/\p{M}/gu,'').toLowerCase();
+  const options=items.filter(item=>(item.name+" "+item.id+" "+item.group).normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().includes(search));
+  select.replaceChildren(new Option(placeholder,""));
+  for(const name of [...new Set(options.map(item=>item.group))]){
+    const group=el('optgroup');group.label=name;
+    for(const item of options.filter(item=>item.group===name))group.append(new Option(item.name+" · "+item.id,item.id));select.append(group);
+  }
+  select.value=options.some(item=>item.id===current)?current:"";
+}
+function metricProvider(metric){return state.metrics?.some(m=>m.id===metric.id)?'Chỉ số tự tính':metric.provider==='pancake'||/^pos_/.test(metric.id)?'Pancake POS':metric.provider==='meta'?'Meta Ads Insights':'Chỉ số chung / Meta / Sheets';}
+function renderFormulaPicker(){
+  const variables=[...Object.entries(state.baseVariables||{}).map(([id,name])=>({id,name,group:(id.startsWith('pos_')||id.startsWith('POS_'))?'Pancake POS':(id.startsWith('meta_')||id.startsWith('META_'))?'Meta Ads Insights':'Chỉ số chung / Meta / Sheets'})),
+    ...Object.keys(state.parameters||{}).map(id=>({id,name:id,group:'Biến cố định'})),...(state.metrics||[]).filter(m=>m.id!==metricEditingId).map(m=>({id:m.id,name:m.name,group:'Chỉ số tự tính'}))];
+  pickerOptions($("formulaVariableSelect"),variables,$("formulaVariableSearch").value);
+}
 function builderMarkDirty() {
   builderDirty=true;builderPreviewVersion++;
   $("tplPreview").disabled=false;
@@ -42,8 +68,8 @@ function setupBuilder(data) {
   }
   $("metaAccountCount").textContent=count;
   if(!count)$("metaAccounts").append(el("p","Chưa có kết nối Meta. Lưu token hợp lệ để đọc danh sách tài khoản.","hint"));
-  builderGroupId=data.groups.some(group=>group.id===builderGroupId)?builderGroupId:data.groups[0]?.id;
-  builderSelect($("tplGroup"),data.groups,builderGroupId);
+  if(!builderCreating)builderGroupId=data.groups.some(group=>group.id===builderGroupId)?builderGroupId:data.groups[0]?.id;
+  builderSelect($("tplGroup"),[...data.groups,...(builderCreating?[{id:builderGroupId,name:"Mẫu mới · chưa lưu"}]:[])],builderGroupId);
   $("templateFields").disabled=!data.canEditGroups||!builderGroupId;
   if(!builderDirty)fillBuilderGroup();
   else {
@@ -92,10 +118,11 @@ function fillBuilderGroup() {
   $("tplPeriod").value=definition?.period||"today";$("tplComparison").value=definition?.comparison||"previous";$("tplDetail").value=definition?.detail||"summary";
   $("tplConstants").value=builderParameterText(definition?.constants);
   $("tplBody").value=definition?.body||"";
+  $("tplStatusLabels").value=builderMapText(definition?.statusLabels);
   builderMetricOrder=[...(definition?.metrics||["cost","messages","phones","cost_per_message"])];
   const today=new Date(Date.now()+7*3600000).toISOString().slice(0,10);
   $("tplAnchor").value=today;$("tplFrom").value=today;$("tplTo").value=today;
-  $("templateSaveState").textContent=definition?"Đã lưu":"Mẫu Sheets hiện tại";$("templateSaveState").className="pill";
+  $("templateSaveState").textContent=builderCreating?"Mẫu mới · chưa lưu":definition?"Đã lưu":"Mẫu Sheets hiện tại";$("templateSaveState").className="pill";
   $("tplReset").hidden=!definition;
   $("templatePreviewText").textContent="Chọn nguồn, chỉ số và chạy thử để xem báo cáo.";
   $("templatePreviewMetrics").replaceChildren();feedback("templateFeedback");feedback("templatePreviewFeedback");
@@ -103,6 +130,7 @@ function fillBuilderGroup() {
 }
 function builderSourceFields() {
   const source=$("tplSource").value;
+  $("tplStatusMapping").hidden=source!=="pancake";
   if($("tplPosFields")){ $("tplPosFields").hidden=source!=="pancake"; for(const id of ["tplPosConnection","tplPosShop","tplPosCpa","tplPosMinimum"]){$(id).required=source==="pancake";} for(const input of $("tplPosFields").querySelectorAll("input,select"))input.disabled=source!=="pancake"; }
   $("tplComparison").disabled=source==="pancake";if(source==="pancake")$("tplComparison").value="none";
   $("tplMetaFields").hidden=source==="sheets";$("tplPhoneFields").hidden=source!=="hybrid";
@@ -143,8 +171,10 @@ function builderInsert(input,text) {
   input.dispatchEvent(new Event("input",{bubbles:true}));
 }
 function renderBuilderChoices() {
-  const definitions=state.metricDefinitions||[];
-  const order=[...builderMetricOrder,...definitions.map(metric=>metric.id).filter(id=>!builderMetricOrder.includes(id))];
+  let labels={};try{labels=builderValueMap($("tplStatusLabels").value,true);}catch{/* Keep typing; validation runs when saved. */}
+  const definitions=(state.metricDefinitions||[]).map(metric=>{const code=/^API_POS_STATUS_(\d+)$/.exec(metric.id)?.[1];return code&&labels[code]?{...metric,name:"POS · Số đơn trạng thái "+code+" · "+labels[code]}:metric;});
+  const order=[...builderMetricOrder];
+  pickerOptions($("tplMetricSelect"),definitions.filter(m=>!builderMetricOrder.includes(m.id)).map(m=>({id:m.id,name:m.name,group:metricProvider(m)})),$("tplMetricSearch").value,"Chọn chỉ số cần thêm");
   $("tplMetricList").replaceChildren(...order.map(id=>definitions.find(metric=>metric.id===id)).filter(Boolean).map(metric=>{
     const row=el("div",undefined,"builderMetricChoice"),label=el("label",undefined,"checkLabel"),input=el("input");input.type="checkbox";input.checked=builderMetricOrder.includes(metric.id);
     const text=el("span");text.append(el("b",metric.name),el("small",metric.formula));
@@ -160,8 +190,8 @@ function renderBuilderChoices() {
     }
     return row;
   }));
-  const variables=["ten_nhom","ky_bao_cao","chi_so","chi_tiet","so_sanh","nguon","thoi_diem_doc","mui_gio","san_pham_ban_chay","nhan_dinh","doi_soat",...builderMetricOrder.filter(id=>definitions.find(metric=>metric.id===id)?.scope!=="row")];
-  $("tplPlaceholders").replaceChildren(...variables.map(name=>{const button=el("button","{{"+name+"}}","variableButton");button.type="button";button.onclick=()=>builderInsert($("tplBody"),"{{"+name+"}}");return button;}));
+  const variables=["ten_nhom","ky_bao_cao","chi_so","chi_tiet","so_sanh","nguon","thoi_diem_doc","mui_gio","san_pham_ban_chay","nhan_dinh","doi_soat","TRANG_THAI_DON_HANG"];
+  pickerOptions($("tplPlaceholderSelect"),[...variables.map(id=>({id,name:"{{"+id+"}}",group:"Nội dung báo cáo"})),...builderMetricOrder.map(id=>definitions.find(m=>m.id===id)).filter(m=>m&&m.scope!=="row").map(m=>({id:m.id,name:m.name,group:metricProvider(m)}))],$("tplPlaceholderSearch").value);
 }
 function templateDraft() {
   const source=$("tplSource").value;
@@ -172,7 +202,7 @@ function templateDraft() {
     messageAction:$("tplMessageAction").value==="custom"?$("tplMessageCustom").value.trim():$("tplMessageAction").value}:{}),
     ...(source==="hybrid"?{phoneSheetName:$("tplPhoneProduct").value}:{}),
     ...(source==="pancake"?salesTemplateDraft():{}),
-    metrics:builderMetricOrder,period:$("tplPeriod").value,comparison:$("tplComparison").value,detail:$("tplDetail").value,
+    statusLabels:builderValueMap($("tplStatusLabels").value,true),metrics:builderMetricOrder,period:$("tplPeriod").value,comparison:$("tplComparison").value,detail:$("tplDetail").value,
     constants:builderParameters($("tplConstants").value),body:$("tplBody").value.trim()};
 }
 function builderTab(metric) {
@@ -186,16 +216,19 @@ function fillMetric() {
   $("metricName").value=metric?.name||"";$("metricId").value=metric?.id||"";$("metricId").disabled=!!metric;
   $("metricFormula").value=metric?.formula||"";$("metricUnit").value=metric?.unit||"number";$("metricDecimals").value=metric?.decimals??0;$("metricScope").value=metric?.scope||"both";
   $("metricParameters").value=builderParameterText(state.parameters);
+  $("metricValueMap").value=builderMapText(metric?.valueMap);
   $("metricDelete").hidden=!metric;feedback("metricFeedback");feedback("formulaResult","Chưa tính thử");
-  const oldValues=new Map([...$("formulaTestValues").querySelectorAll("input")].map(input=>[input.dataset.variable,input.value]));
-  $("formulaTestValues").replaceChildren(...Object.entries(state.baseVariables||{}).map(([id,name])=>{
-    const label=el("label"),input=el("input");input.type="number";input.step="any";input.dataset.variable=id;input.setAttribute("aria-label","Số thử: "+name);
-    input.value=oldValues.get(id)??({chi_phi:"100000",tin_nhan:"10",so_dien_thoai:"2"}[id]||"");
-    label.append(el("span",name),el("code",id),input);return label;
-  }));
-  const variables=[...Object.keys(state.baseVariables||{}),...Object.keys(state.parameters||{}),...(state.metrics||[]).filter(item=>item.id!==metricEditingId).map(item=>item.id)];
-  $("formulaVariables").replaceChildren(...variables.map(name=>{const button=el("button",name,"variableButton");button.type="button";button.onclick=()=>builderInsert($("metricFormula"),name);return button;}));
+  renderFormulaInputs();
+  renderFormulaPicker();
+  $("formulaOperators").replaceChildren(...["+","-","*","/","(",")"].map(op=>{const button=el("button",op,"secondary");button.type="button";button.setAttribute("aria-label","Chèn phép tính "+op);button.onclick=()=>builderInsert($("metricFormula")," "+op+" ");return button;}));
   validateMetricCode();
+}
+function renderFormulaInputs(){
+ const old=new Map([...$("formulaTestValues").querySelectorAll("input")].map(input=>[input.dataset.variable,input.value]));
+ const seen=new Set(),needed=new Set();
+ const visit=(text,depth=0)=>{if(depth>25)return;for(const id of text.match(/[A-Za-z][A-Za-z0-9_]*/g)||[]){if(seen.has(id))continue;seen.add(id);if(Object.hasOwn(state.baseVariables||{},id))needed.add(id);else{const metric=(state.metricDefinitions||[]).find(m=>m.id===id);if(metric)visit(metric.formula,depth+1);}}};
+ visit($("metricFormula").value);if(!$("metricFormula").value.trim())for(const id of ["chi_phi","tin_nhan","so_dien_thoai"])if(Object.hasOwn(state.baseVariables||{},id))needed.add(id);
+ $("formulaTestValues").replaceChildren(...[...needed].map(id=>{const label=el("label"),input=el("input");input.type="number";input.step="any";input.dataset.variable=id;input.setAttribute("aria-label","Số thử: "+state.baseVariables[id]);input.value=old.get(id)??({chi_phi:"100000",tin_nhan:"10",so_dien_thoai:"2"}[id]||"");label.append(el("span",state.baseVariables[id]),el("code",id),input);return label;}));
 }
 function validateMetricCode() {
   const input=$("metricId"),id=input.value.trim();
@@ -205,7 +238,7 @@ function validateMetricCode() {
 }
 function metricDraft() {
   return {id:$("metricId").value.trim(),name:$("metricName").value.trim(),formula:$("metricFormula").value.trim(),
-    unit:$("metricUnit").value,decimals:Number($("metricDecimals").value),scope:$("metricScope").value};
+    valueMap:builderValueMap($("metricValueMap").value),unit:$("metricUnit").value,decimals:Number($("metricDecimals").value),scope:$("metricScope").value};
 }
 async function loadReportHistory() {
   $("reloadHistory").disabled=true;feedback("reportHistoryFeedback","Đang đọc lịch sử…");
@@ -242,15 +275,20 @@ document.getElementById("metaRemove").onclick=async()=>{
 document.getElementById("builderReportTab").onclick=()=>builderTab(false);
 document.getElementById("builderMetricsTab").onclick=()=>builderTab(true);
 document.getElementById("openMetricEditor").onclick=()=>builderTab(true);
-document.getElementById("builderNewGroup").onclick=()=>{location.hash="#settings";$("newGroup").click();};
+document.getElementById("builderNewGroup").onclick=()=>{
+  if(builderDirty&&!confirm("Bỏ thay đổi chưa lưu để tạo mẫu mới?"))return;
+  builderCreating=true;builderGroupId=crypto.randomUUID();builderDirty=false;
+  builderSelect($("tplGroup"),[...state.groups,{id:builderGroupId,name:"Mẫu mới · chưa lưu"}],builderGroupId);
+  fillBuilderGroup();builderMarkDirty();location.hash="#templates";$("tplName").focus();
+};
 document.getElementById("tplGroup").onchange=()=>{
   if(builderDirty&&!confirm("Bỏ thay đổi mẫu chưa lưu để mở nhóm khác?")){$("tplGroup").value=builderGroupId;return;}
-  builderDirty=false;builderGroupId=$("tplGroup").value;fillBuilderGroup();
+  builderDirty=false;builderCreating=false;builderGroupId=$("tplGroup").value;fillBuilderGroup();
 };
 document.getElementById("templateForm").oninput=builderMarkDirty;
 document.getElementById("tplSource").onchange=()=>{
-  if($("tplSource").value==="meta")builderMetricOrder=builderMetricOrder.filter(id=>!["phones","cost_per_phone","phone_rate"].includes(id));
-  if($("tplSource").value==="pancake")builderMetricOrder=["cost","messages","pos_orders","pos_units","pos_revenue","pos_cpa","pos_roas",...builderMetricOrder.filter(id=>(state.metrics||[]).some(m=>m.id===id))];
+  // Source changes never remove selected metrics; unavailable inputs remain explicit in previews.
+  if($("tplSource").value==="pancake")builderMetricOrder=[...new Set([...builderMetricOrder,"pos_orders","pos_units","pos_revenue","pos_cpa","pos_roas"])];
   builderSourceFields();renderBuilderChoices();builderMarkDirty();
 };
 document.getElementById("tplMessageAction").onchange=builderSourceFields;
@@ -270,16 +308,17 @@ document.getElementById("templateForm").onsubmit=async event=>{
   event.preventDefault();if(builderSaving)return;
   builderSaving=true;builderDirty=true;lockTemplateSave(true);feedback("templateFeedback","Đang kiểm tra và lưu mẫu…");
   try {
-    const groupId=builderGroupId,name=$("tplName").value.trim(),definition=templateDraft();
+    const groupId=builderGroupId,creating=builderCreating,name=$("tplName").value.trim(),definition=templateDraft();
     const fresh=await api("state"),group=fresh.groups.find(item=>item.id===groupId);
-    if(!group)throw Error("Nhóm này đã bị gỡ. Nội dung đang chỉnh vẫn được giữ để bạn chuyển sang nhóm khác.");
-    if(builderTemplateVersion(group)!==builderBase)throw Error("Mẫu này đã được chỉnh ở nơi khác. Nội dung của bạn vẫn được giữ; đối chiếu với bản đã lưu trước khi lưu lại.");
+    if(creating&&group)throw Error("Mã mẫu mới đã tồn tại; bản đang chỉnh vẫn được giữ.");
+    if(!creating&&!group)throw Error("Nhóm này đã bị gỡ. Nội dung đang chỉnh vẫn được giữ để bạn chuyển sang nhóm khác.");
+    if(!creating&&builderTemplateVersion(group)!==builderBase)throw Error("Mẫu này đã được chỉnh ở nơi khác. Nội dung của bạn vẫn được giữ; đối chiếu với bản đã lưu trước khi lưu lại.");
     // Refresh unrelated settings/revisions while setupBuilder keeps this draft.
     updateState(fresh);lockTemplateSave(true);
-    const saved=await api("report-definition",{groupId,name,definition,revision:fresh.revision});
+    const saved=await api("report-definition",{groupId,name,definition,...(creating?{create:true}:{}),revision:fresh.revision});
     if(!saved.saved||!Number.isInteger(saved.revision)||saved.group?.id!==groupId)throw Error("Chưa nhận đủ xác nhận lưu. Giữ nội dung đang chỉnh và kiểm tra bản đã lưu.");
-    const groups=fresh.groups.map(item=>item.id===groupId?{...item,...saved.group}:item);
-    builderDirty=false;updateState({...fresh,groups,revision:saved.revision});
+    const groups=creating?[...fresh.groups,saved.group]:fresh.groups.map(item=>item.id===groupId?{...item,...saved.group}:item);
+    builderDirty=false;builderCreating=false;updateState({...fresh,groups,revision:saved.revision});
     feedback("templateFeedback","Đã lưu. Bot và lịch gửi dùng cấu hình mới ở lần chạy tiếp theo.");
   }catch(error){feedback("templateFeedback",error.message,true);}finally{builderSaving=false;lockTemplateSave(false);}
 };
@@ -302,7 +341,7 @@ document.getElementById("templatePreviewForm").onsubmit=async event=>{
   const version=++builderPreviewVersion;$("tplPreview").disabled=true;feedback("templatePreviewFeedback","Đang đọc nguồn và tính chỉ số…");
   try {
     const dates=$("tplPreviewMode").value==="range"?{from:$("tplFrom").value,to:$("tplTo").value}:{anchor:$("tplAnchor").value};
-    const result=await api("template-preview",{groupId:builderGroupId,name:$("tplName").value.trim(),definition:templateDraft(),...dates});
+    const result=await api("template-preview",{groupId:builderGroupId,...(builderCreating?{create:true}:{}),name:$("tplName").value.trim(),definition:templateDraft(),...dates});
     if(version!==builderPreviewVersion)return;
     $("templatePreviewText").textContent=result.text;
     $("templatePreviewMetrics").replaceChildren(...(result.report.metricValues||[]).filter(metric=>metric.value===null&&!metric.untracked).map(metric=>el("p",metric.name+": "+metric.reason,"hint")));
@@ -319,7 +358,7 @@ function invalidateFormulaPreview() {
   formulaPreviewVersion++;$("formulaTest").disabled=false;
   feedback("formulaResult","Đầu vào đã đổi. Tính thử lại để kiểm tra.");
 }
-document.getElementById("metricForm").oninput=()=>{metricDirty=true;validateMetricCode();invalidateFormulaPreview();};
+document.getElementById("metricForm").oninput=()=>{metricDirty=true;validateMetricCode();renderFormulaInputs();invalidateFormulaPreview();};
 document.getElementById("formulaTestValues").oninput=invalidateFormulaPreview;
 document.getElementById("metricForm").onsubmit=async event=>{
   event.preventDefault();$("metricSave").disabled=true;feedback("metricFeedback","Đang kiểm tra công thức và tham chiếu…");
@@ -344,10 +383,22 @@ document.getElementById("formulaTest").onclick=async()=>{
     const response=await api("formula-preview",{formula:$("metricFormula").value,metric:metricDraft(),values,parameters:builderParameters($("metricParameters").value)});
     if(version!==formulaPreviewVersion)return;
     const result=response.result;
-    feedback("formulaResult",result.value===null?"Không tính được · "+result.reason:new Intl.NumberFormat("vi-VN",{maximumFractionDigits:Number($("metricDecimals").value)}).format(result.value)+($("metricUnit").value==="percent"?"%":$("metricUnit").value==="currency"?" (đơn vị tiền của báo cáo)":""));
+    const mapped=result.value!==null?metricDraft().valueMap?.[String(result.value)]:undefined;
+    feedback("formulaResult",result.value===null?"Không tính được · "+result.reason:mapped?String(result.value)+" → "+mapped:new Intl.NumberFormat("vi-VN",{maximumFractionDigits:Number($("metricDecimals").value)}).format(result.value)+($("metricUnit").value==="percent"?"%":$("metricUnit").value==="currency"?" (đơn vị tiền của báo cáo)":""));
   }catch(error){if(version===formulaPreviewVersion)feedback("formulaResult",error.message,true);}finally{if(version===formulaPreviewVersion)$("formulaTest").disabled=false;}
 };
 document.getElementById("reloadHistory").onclick=loadReportHistory;
 window.addEventListener("beforeunload",event=>{if(builderDirty||metricDirty){event.preventDefault();event.returnValue="";}});
 
 if(document.getElementById("tplPosConnection"))document.getElementById("tplPosConnection").onchange=()=>{fillSalesTemplateShops();builderMarkDirty();};
+
+document.getElementById("tplMetricSearch").oninput=renderBuilderChoices;
+document.getElementById("tplPlaceholderSearch").oninput=renderBuilderChoices;
+document.getElementById("formulaVariableSearch").oninput=renderFormulaPicker;
+document.getElementById("tplAddMetric").onclick=()=>{
+ const id=$("tplMetricSelect").value;if(!id)return;
+ if(builderMetricOrder.length>=60){feedback("templateFeedback","Chọn tối đa 60 chỉ số trong một mẫu.",true);return;}
+ builderMetricOrder=[...new Set([...builderMetricOrder,id])];builderMarkDirty();renderBuilderChoices();
+};
+document.getElementById("tplInsertPlaceholder").onclick=()=>{const id=$("tplPlaceholderSelect").value;if(id)builderInsert($("tplBody"),"{{"+id+"}}");};
+document.getElementById("formulaInsertVariable").onclick=()=>{const id=$("formulaVariableSelect").value;if(id)builderInsert($("metricFormula"),id);};

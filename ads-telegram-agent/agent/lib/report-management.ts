@@ -16,7 +16,7 @@ function revision(body:Record<string,unknown>) {
 export async function reportManagement(path:string,body:Record<string,unknown>) {
   const registry=await getRegistry();
   if(path==="/api/formula-preview") {
-    const input=z.object({formula:z.string().min(1).max(512),values:z.record(z.string().regex(/^[a-z][a-z0-9_]{0,47}$/),z.number().finite().nullable()).refine(values=>Object.keys(values).length<=60),
+    const input=z.object({formula:z.string().min(1).max(512),values:z.record(z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,63}$/),z.number().finite().nullable()).refine(values=>Object.keys(values).length<=60),
       metric:metricSchema.optional(),parameters:parametersSchema.optional()}).safeParse(body);
     if(!input.success)throw new GroupError("Kiểm tra công thức và các biến chạy thử.");
     const values={...(input.data.parameters??registry.parameters??{}),...input.data.values};
@@ -62,13 +62,18 @@ export async function reportManagement(path:string,body:Record<string,unknown>) 
     console.info("Custom report metrics updated",{count:metrics.length});
     return {saved:true};
   }
-  const group=registry.groups.find(group=>group.id===body.groupId);
+  const creating=body.create===true;
+  const existing=registry.groups.find(group=>group.id===body.groupId);
+  if(creating&&existing)throw new GroupError("Mã mẫu mới đã tồn tại. Tạo mẫu mới với mã khác; mẫu hiện tại được giữ nguyên.",409);
+  if(creating&&(typeof body.groupId!=="string"||!/^[a-z0-9-]{1,64}$/.test(body.groupId)))throw new GroupError("Mã nhóm mới không hợp lệ.");
+  const group=existing||(creating?{id:body.groupId as string,name:"",enabled:false,sources:{},schedule:{enabled:false,time:"09:00",days:[0,1,2,3,4,5,6],reportDay:"today" as const}}:undefined);
   if(!group)throw new GroupError("Chọn nhóm báo cáo đã lưu.",404);
   const name=body.name===undefined?group.name:typeof body.name==="string"?body.name.trim():"";
   if(!name||name.length>80)throw new GroupError("Tên mẫu báo cáo dài từ 1 đến 80 ký tự.");
   if(registry.groups.some(item=>item.id!==group.id&&item.name.toLocaleLowerCase("vi")===name.toLocaleLowerCase("vi")))
     throw new GroupError("Tên nhóm/mẫu báo cáo đã được sử dụng.");
   if(body.reset===true) {
+    if(creating)throw new GroupError("Lưu mẫu mới trước khi đặt lại.");
     if(!Object.keys(group.sources).length)throw new GroupError("Thêm nguồn Sheets trước khi quay lại mẫu mặc định.");
     const saved=await updateRegistry(revision(body),draft=>{delete draft.groups.find(item=>item.id===group.id)!.report;});
     return {saved:true,revision:saved.revision,group:saved.groups.find(item=>item.id===group.id)};
@@ -81,7 +86,13 @@ export async function reportManagement(path:string,body:Record<string,unknown>) 
       if(definition.campaignIds.some(id=>!campaigns.some(campaign=>campaign.id===id)))throw new GroupError("Campaign không thuộc tài khoản đã chọn.");
     }
     if(definition.source==="hybrid"&&!Object.keys(group.sources).length)throw new GroupError("Thêm nguồn Sheets cho nhóm trước khi ghép SĐT.");
-    const saved=await updateRegistry(revision(body),draft=>{const item=draft.groups.find(item=>item.id===group.id)!;item.report=definition;item.name=name;});
+    const saved=await updateRegistry(revision(body),draft=>{
+      if(creating){
+        if(draft.groups.some(item=>item.id===group.id))throw new GroupError("Mã mẫu mới đã tồn tại.",409);
+        if(draft.groups.length>=30)throw new GroupError("Tối đa 30 nhóm/mẫu.");
+        draft.groups.push({...group,name,report:definition});
+      }else{const item=draft.groups.find(item=>item.id===group.id)!;item.report=definition;item.name=name;}
+    });
     console.info("Report definition updated",{groupId:group.id,source:definition.source});
     return {saved:true,revision:saved.revision,group:saved.groups.find(item=>item.id===group.id)};
   }

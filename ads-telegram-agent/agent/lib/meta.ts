@@ -3,6 +3,7 @@ import { GroupError, getRegistry, hasGroupStorage } from "./groups.ts";
 import { readPrivate, updatePrivate } from "./private-store.ts";
 import { validateDate } from "./report.ts";
 import type {AdIdentity} from "./pancake/types.ts";
+import {metaFields} from "./source-catalog.ts";
 
 export const metaVersion="v26.0";
 const accountSchema=z.object({id:z.string().regex(/^act_\d{1,30}$/),name:z.string().max(200),
@@ -121,18 +122,20 @@ export async function metaCampaigns(connectionId:string,accountId:string) {
   if(!parsed.success)throw new GroupError("Meta: danh sách campaign không hợp lệ.",502);
   return parsed.data;
 }
-type MetaScope={connectionId:string;accountId:string;campaignIds:string[];messageAction:string};
+type MetaScope={connectionId:string;accountId:string;campaignIds:string[];messageAction:string;variables?:string[]};
 export async function readMetaInsights(scope:MetaScope,range:{from:string;to:string}) {
   validateDate(range.from);validateDate(range.to);
   const {saved,account}=await accessible(scope.connectionId,scope.accountId);
   const campaigns=await metaCampaigns(scope.connectionId,scope.accountId);
   if(scope.campaignIds.some(id=>!campaigns.some(campaign=>campaign.id===id)))throw new GroupError("Meta: campaign không còn thuộc tài khoản đã chọn. Kiểm tra lại phạm vi.");
-  const raw=await collection(saved.token,scope.accountId+"/insights",{
-    fields:"campaign_id,campaign_name,spend,impressions,inline_link_clicks,actions,action_values",
-    level:"campaign",time_range:JSON.stringify({since:range.from,until:range.to}),
+  const selected=metaFields.filter(f=>(scope.variables?.includes(f.id.toUpperCase())||scope.variables?.includes(f.id)));
+  const fields=[...new Set(["spend","impressions","inline_link_clicks","actions","action_values",...selected.map(f=>f.field!)])];
+  const params={
+    time_range:JSON.stringify({since:range.from,until:range.to}),
     use_unified_attribution_setting:"true",action_report_time:"impression",
     ...(scope.campaignIds.length?{filtering:JSON.stringify([{field:"campaign.id",operator:"IN",value:scope.campaignIds}])}:{})
-  });
+  };
+  const raw=await collection(saved.token,scope.accountId+"/insights",{...params,fields:["campaign_id","campaign_name",...fields].join(","),level:"campaign"});
   const numeric=(value:unknown):number|null=>{if(typeof value!=="string"&&typeof value!=="number")return null;const number=Number(value);return value!==""&&Number.isFinite(number)&&number>=0?number:null;};
   const action=(value:unknown,names:string[]):number|null=>{
     if(value===undefined)return 0;
@@ -141,6 +144,7 @@ export async function readMetaInsights(scope:MetaScope,range:{from:string;to:str
     return 0;
   };
   const campaignRows=new Set<string>();
+  const expanded=(row:Record<string,unknown>)=>Object.fromEntries(selected.map(f=>[f.id,f.field==="video_avg_time_watched_actions"?numeric(Array.isArray(row[f.field])?(row[f.field] as {action_type:string;value:unknown}[]).find(a=>a.action_type===f.action)?.value:undefined):f.action?action(row[f.field!],[f.action]):numeric(row[f.field!])]));
   const rows=raw.map(value=>{
     if(!value||typeof value!=="object")throw new GroupError("Meta: dòng báo cáo không hợp lệ.",502);
     const row=value as Record<string,unknown>;
@@ -150,11 +154,18 @@ export async function readMetaInsights(scope:MetaScope,range:{from:string;to:str
     campaignRows.add(row.campaign_id);
     return {id:row.campaign_id,name:typeof row.campaign_name==="string"?row.campaign_name:"Campaign "+row.campaign_id,
       cost:numeric(row.spend),messages:action(row.actions,[scope.messageAction]),
-      metrics:{hien_thi:numeric(row.impressions),nhap_lien_ket:numeric(row.inline_link_clicks),
+      metrics:{...expanded(row),hien_thi:numeric(row.impressions),nhap_lien_ket:numeric(row.inline_link_clicks),
         lead:action(row.actions,["lead","offsite_conversion.fb_pixel_lead"]),
         don_hang:action(row.actions,["purchase","offsite_conversion.fb_pixel_purchase"]),
-        doanh_thu:action(row.action_values,["purchase","offsite_conversion.fb_pixel_purchase"])}};
+        doanh_thu:action(row.action_values,["purchase","offsite_conversion.fb_pixel_purchase"])} as Record<string,number|null>};
   });
-  return {rows,currency:account.currency,timeZone:account.timezone_name,
+  let summaryMetrics:Record<string,number|null>|undefined;
+  if(selected.length){
+    const total=await collection(saved.token,scope.accountId+"/insights",{...params,fields:fields.join(","),level:"account"});
+    if(total.length>1)throw new GroupError("Meta: tổng kỳ trả nhiều dòng không mong đợi.",502);
+    const record=total[0];if(record&&typeof record!=="object")throw new GroupError("Meta: tổng kỳ không hợp lệ.",502);
+    summaryMetrics=record?expanded(record as Record<string,unknown>):Object.fromEntries(selected.map(f=>[f.id,/frequency|cpc|cpp|ctr|rate|cost_per|avg_time/.test(f.field!)?null:0]));
+  }
+  return {rows,...(summaryMetrics?{summaryMetrics}:{}),currency:account.currency,timeZone:account.timezone_name,
     sourceUrl:"https://adsmanager.facebook.com/adsmanager/manage/campaigns?act="+scope.accountId.slice(4)};
 }

@@ -1,4 +1,5 @@
 import { reservedMetricIds } from "./report-definition.ts";
+import {sourceFieldVariables,sourceFieldMetrics} from "./source-catalog.ts";
 export const baseVariables = {
   chi_phi: "Chi phí", tin_nhan: "Tin nhắn", so_dien_thoai: "SĐT",
   chi_phi_co_sdt: "Chi phí của sản phẩm có theo dõi SĐT",
@@ -8,6 +9,7 @@ export const baseVariables = {
   pos_don_hang:"Đơn Pancake theo trạng thái đã chọn",pos_doanh_thu:"Doanh thu hàng hóa Pancake sau hoàn và chiết khấu",
   pos_so_luong:"Số sản phẩm thương mại giữ lại",pos_don_khop:"Đơn Pancake nối chính xác campaign",pos_doanh_thu_khop:"Doanh thu đơn nối chính xác campaign",
   pos_cpa_an_toan:"CPA Pancake sau kiểm tra độ phủ, tiền tệ, múi giờ và độ mới",pos_roas_an_toan:"ROAS Pancake sau kiểm tra chất lượng",
+  ...sourceFieldVariables,
 };
 export type FormulaValue = { value: number | null; reason?: string };
 export type MetricExpression = { id: string; formula: string };
@@ -111,12 +113,17 @@ export function calculateFormula(expression:string, values:Record<string,number|
   return evaluate(parsed.tree,name=>Object.hasOwn(values,name) && typeof values[name]==="number" ?
     finite(values[name]!) : missing("Thiếu số liệu: " + name + "."),{left:2048});
 }
+export function requiredInputVariables(definitions:MetricExpression[],selected:string[]):string[]{
+  const map=new Map(definitions.map(d=>[d.id,d.formula])),seen=new Set<string>(),inputs=new Set<string>();
+  const visit=(id:string)=>{if(seen.has(id))return;seen.add(id);const formula=map.get(id);if(formula){for(const name of parse(formula).names)visit(name);}else if(id!=="NULL")inputs.add(id);};
+  selected.forEach(visit);return [...inputs];
+}
 export function validateMetrics(definitions:MetricExpression[], constants:string[] = []) {
-  if(definitions.length>50)fail("tối đa 50 chỉ số.");
+  if(definitions.length>200)fail("tối đa 200 chỉ số gồm danh mục nguồn và công thức riêng.");
   const allowed=new Set([...Object.keys(baseVariables),...constants,"NULL"]);
   const trees=new Map<string,ReturnType<typeof parse>>();
   for(const definition of definitions) {
-    if(!/^[a-z][a-z0-9_]{0,47}$/.test(definition.id)||forbidden.has(definition.id))fail("mã chỉ số chưa hợp lệ.");
+    if((!/^[a-z][a-z0-9_]{0,47}$/.test(definition.id)&&!sourceFieldMetrics.some(f=>f.id===definition.id))||forbidden.has(definition.id))fail("mã chỉ số chưa hợp lệ.");
     if(allowed.has(definition.id)||trees.has(definition.id))fail("mã chỉ số trùng biến hoặc chỉ số khác.");
     if(reservedMetricIds.includes(definition.id))fail("mã chỉ số dành riêng cho nội dung mẫu.");
     trees.set(definition.id,parse(definition.formula));

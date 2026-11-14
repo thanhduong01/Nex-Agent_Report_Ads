@@ -286,3 +286,15 @@ Tại **Nguồn dữ liệu**, kiểm tra database, lưu khóa API Pancake cùng
 ### Kiểm chứng trước khi sử dụng doanh thu
 
 Dùng một tập đơn thực tế đại diện tối thiểu 7 ngày, gồm đơn hủy, hoàn một phần/toàn bộ, quà, combo và các quy ước giảm giá; đối chiếu số đơn, số lượng, tiền tệ, doanh thu và độ phủ ID ad với Pancake/Ads Manager. Kiểm thử tự động sử dụng dữ liệu tổng hợp; chưa thay thế bước đối chiếu dữ liệu doanh nghiệp.
+
+
+## Tạo mẫu và chọn chỉ số
+
+- **+ Tạo nhóm/mẫu** mở bản nháp mới ngay trong Mẫu & chỉ số, có ID riêng. Lưu tạo nhóm độc lập với lịch tắt; không đổi mẫu đang xem trước đó. Chỉnh mẫu đang có vẫn kiểm tra revision và bản lưu mới nhất trước khi ghi.
+- Danh mục gồm 123 chỉ số dựng sẵn (Meta, POS và chỉ số chung), cộng các công thức riêng. Tìm theo tên/mã rồi **Thêm chỉ số**. Đổi nguồn giữ lại lựa chọn cũ; chỉ số không có dữ liệu ở nguồn mới hiển thị chưa khả dụng.
+- Chọn biến trong dropdown và bấm **Chèn biến**, hoặc nhập trực tiếp `+ - * / ( )`. Ví dụ: `pos_doanh_thu - chi_phi - POS_SHIPPING_FEE`. Mã nguồn mới viết hoa (`META_REACH`, `POS_CASH`); chỉ số dựng sẵn tương ứng có mã `API_META_REACH`, `API_POS_CASH`. Công thức và biến chữ thường đã lưu trước đây giữ nguyên ý nghĩa.
+- Meta mở rộng gồm delivery/reach, click/engagement, messaging, thương mại và video; trường chỉ được yêu cầu khi mẫu/công thức cần. Reach, tần suất, tỷ lệ/chi phí bình quân dùng kết quả tổng kỳ từ Meta theo đúng campaign filter, không cộng bình quân các dòng. Một số trường phụ thuộc phiên bản API, quyền/mục tiêu quảng cáo và có thể không trả được. Ứng dụng không tuyên bố mọi trường của Meta đều có ở mọi tài khoản.
+- POS mở rộng gồm phân bố trạng thái, số lượng, tiền COD/cash, phí vận chuyển/sàn/thanh toán, phụ thu và kênh thanh toán được API cung cấp. Các trường tiền API dùng toàn cohort đơn chưa xóa/bỏ dở trong ngày đã chọn, gồm cả đơn chưa xác nhận; chỉ số doanh thu/đơn thương mại cũ vẫn theo cơ sở xác nhận/đã giao. Số tiền cần thu/đã ghi nhận không được coi là doanh thu bán hàng. Trường thiếu vẫn là null. Không có dữ liệu giá vốn thì dùng biến chi phí do bạn cấu hình; không giả lập lợi nhuận.
+- **Nhãn hiển thị trạng thái POS** nhận mỗi dòng `4 = Thành công`; chèn `{{TRANG_THAI_DON_HANG}}` để có số đơn theo mã/nhãn. Mã4 vẫn là trạng thái đang hoàn theo API và quy tắc doanh thu không thay đổi. Nhãn cũng áp dụng cho tên chỉ số trạng thái trên báo cáo.
+- **Quy đổi kết quả số thành nhãn** trong Chỉ số tự tính nhận `0 = Chưa có`, `4 = Thành công`. Các công thức khác tham chiếu chỉ số vẫn nhận số gốc; web và Telegram dùng cùng nhãn khi hiển thị.
+- Dữ liệu POS đã lưu ở phiên bản trước được nhập lại trong cửa sổ 8 ngày và đối chiếu chi tiết khi timestamp không đổi để bổ sung trường tiền mới. Trong lúc chưa cập nhật đủ, chỉ số mới có thể chưa khả dụng.

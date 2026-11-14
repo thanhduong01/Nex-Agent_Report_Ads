@@ -8,10 +8,11 @@ import type { Source } from "./config.ts";
 import { readMetaInsights } from "./meta.ts";
 import { defaultMetrics, reportDefinitionSchema, templateTextVariables, templateAliases } from "./report-definition.ts";
 import type { CustomMetric, ReportDefinition } from "./report-definition.ts";
-import { evaluateMetrics, validateMetrics } from "./formulas.ts";
+import { evaluateMetrics, validateMetrics,requiredInputVariables } from "./formulas.ts";
 import { previousPeriod, resolvePeriod } from "./report-period.ts";
 import { APP_NAME } from "./brand.ts";
 import {readPancakeSales} from "./pancake/report.ts";
+import {sourceFields} from "./source-catalog.ts";
 export type MetricResult=CustomMetric & {value:number|null;reason?:string;untracked?:boolean};
 type Range={from:string;to:string};
 type Readers={sheets?:(source:Source)=>Promise<Tables>;meta?:typeof readMetaInsights;pancake?:typeof readPancakeSales};
@@ -50,7 +51,7 @@ function valuesFor(rows:Row[],constants:Record<string,number>):Record<string,num
     chi_phi_co_sdt:tracked.length?sum(tracked.map(row=>row.cost)):null,
     tin_nhan_co_sdt:tracked.length?sum(tracked.map(row=>row.messages)):null,
     hien_thi:extra("hien_thi"),nhap_lien_ket:extra("nhap_lien_ket"),lead:extra("lead"),don_hang:extra("don_hang"),doanh_thu:extra("doanh_thu"),
-    ...Object.fromEntries(["pos_don_hang","pos_doanh_thu","pos_so_luong","pos_don_khop","pos_doanh_thu_khop","pos_cpa_an_toan","pos_roas_an_toan"].map(key=>[key,extra(key)]))};
+    ...Object.fromEntries(["pos_don_hang","pos_doanh_thu","pos_so_luong","pos_don_khop","pos_doanh_thu_khop","pos_cpa_an_toan","pos_roas_an_toan",...sourceFields.map(f=>f.id)].map(key=>[sourceFields.some(f=>f.id===key)?key.toUpperCase():key,extra(key)]))};
 }
 function results(rows:Row[],definitions:CustomMetric[],selected:string[],constants:Record<string,number>,scope:"total"|"row"):MetricResult[] {
   const calculated=evaluateMetrics(definitions,valuesFor(rows,constants));
@@ -61,22 +62,23 @@ function results(rows:Row[],definitions:CustomMetric[],selected:string[],constan
       return {...metric,...result,...(untracked?{untracked:true,reason:"Không theo dõi SĐT."}:{})};
     });
 }
-async function loadRange(group:ReportGroup,definition:ReportDefinition,range:Range,readers:Readers,cache:Map<string,Promise<Tables>>) {
+async function loadRange(group:ReportGroup,definition:ReportDefinition,range:Range,readers:Readers,cache:Map<string,Promise<Tables>>,variables:string[]=[]) {
   if(definition.source==="sheets") {
     const loaded=await sheetsRange(group,range,readers.sheets,cache);
     return {...loaded,currency:"VND",timeZone:"Asia/Ho_Chi_Minh",breakdown:loaded.rows};
   }
   const meta=await (readers.meta||readMetaInsights)({connectionId:definition.connectionId!,accountId:definition.accountId!,
-    campaignIds:definition.campaignIds,messageAction:definition.messageAction},range);
-  const extras=Object.fromEntries(["hien_thi","nhap_lien_ket","lead","don_hang","doanh_thu"].map(key=>
-    [key,sum(meta.rows.map(row=>row.metrics[key as keyof typeof row.metrics]))]));
+    campaignIds:definition.campaignIds,messageAction:definition.messageAction,variables},range);
+  const extras={...Object.fromEntries(["hien_thi","nhap_lien_ket","lead","don_hang","doanh_thu"].map(key=>
+    [key,sum(meta.rows.map(row=>row.metrics[key as keyof typeof row.metrics]))])),...Object.fromEntries(sourceFields.filter(f=>f.provider==="meta").map(f=>[f.id,meta.summaryMetrics?.[f.id]??null]))};
   if(definition.source==="pancake"){
     const sales=await (readers.pancake||readPancakeSales)(definition,range,meta),t=sales.totals;
-    const pos={pos_don_hang:t.orders,pos_doanh_thu:t.revenue,pos_so_luong:t.units,
+    if(sales.statusCounts)sales.statusCounts=sales.statusCounts.map(s=>({...s,label:definition.statusLabels?.[s.code]||s.label}));
+    const pos={...sales.metrics,pos_don_hang:t.orders,pos_doanh_thu:t.revenue,pos_so_luong:t.units,
       pos_don_khop:sales.complete?sales.attribution.matchedOrders:null,pos_doanh_thu_khop:t.matchedRevenue,pos_cpa_an_toan:t.cpa,pos_roas_an_toan:t.roas};
     return {sales,rows:[makeRow(group.name,t.spend,sum(meta.rows.map(r=>r.messages)),null,false,sales.quality.warnings,{...extras,...pos})],
       currency:meta.currency,timeZone:meta.timeZone,sourceUrl:meta.sourceUrl,
-      breakdown:sales.campaigns.map(c=>makeRow(c.name,c.cost,c.messages,null,false,[],{...meta.rows.find(row=>row.id===c.id)?.metrics,pos_don_hang:c.orders,pos_doanh_thu:c.revenue,pos_so_luong:c.units,
+      breakdown:sales.campaigns.map(c=>makeRow(c.name,c.cost,c.messages,null,false,[],{...meta.rows.find(row=>row.id===c.id)?.metrics,...c.metrics,pos_don_hang:c.orders,pos_doanh_thu:c.revenue,pos_so_luong:c.units,
         pos_don_khop:c.orders,pos_doanh_thu_khop:c.revenue,pos_cpa_an_toan:c.cpa,pos_roas_an_toan:c.roas}))};
   }
   let phones:number|null=null,tracks=false;const issues:string[]=[];
@@ -111,12 +113,16 @@ export function validateReportDefinition(input:unknown,registry:Registry):Report
 export async function createConfiguredReport(group:ReportGroup,registry:Registry,range:Range,readers:Readers={}):Promise<Report> {
   range=resolvePeriod(range.to,"today",range.from);
   const definition=validateReportDefinition(group.report||{source:"sheets",metrics:["cost","messages","phones","cost_per_message"]},registry);
-  const definitions=metricDefinitions(registry),constants={...registry.parameters,...definition.constants};
+  const definitions=metricDefinitions(registry).map(metric=>{
+    const code=/^API_POS_STATUS_(\d+)$/.exec(metric.id)?.[1],label=code&&definition.statusLabels?.[code];
+    return label?{...metric,name:"POS · Số đơn trạng thái "+code+" · "+label}:metric;
+  }),constants={...registry.parameters,...definition.constants};
   const cache=new Map<string,Promise<Tables>>();
-  const current=await loadRange(group,definition,range,readers,cache);
+  const variables=requiredInputVariables(definitions,definition.metrics);
+  const current=await loadRange(group,definition,range,readers,cache,variables);
   let previous:Awaited<ReturnType<typeof loadRange>>|undefined;
   if(definition.comparison==="previous"&&definition.source!=="pancake") {
-    try{previous=await loadRange(group,definition,previousPeriod(range),readers,cache);}catch{/* Explicitly unavailable comparison; current result remains valid. */}
+    try{previous=await loadRange(group,definition,previousPeriod(range),readers,cache,variables);}catch{/* Explicitly unavailable comparison; current result remains valid. */}
   }
   const summary=results(current.rows,definitions,definition.metrics,constants,"total");
   const detail=results;
@@ -137,6 +143,7 @@ function validateBody(body:string,definitions:CustomMetric[]) {
 export function formatMetric(metric:MetricResult,currency="VND") {
   if(metric.untracked)return "Không theo dõi";
   if(metric.value===null)return "Không tính được";
+  if(metric.valueMap&&Object.hasOwn(metric.valueMap,String(metric.value)))return metric.valueMap[String(metric.value)];
   const value=new Intl.NumberFormat("vi-VN",{minimumFractionDigits:metric.decimals,maximumFractionDigits:metric.decimals}).format(metric.value);
   return value+(metric.unit==="currency"?" "+currency:metric.unit==="percent"?"%":"");
 }
@@ -162,6 +169,7 @@ export function renderConfiguredReport(report:Report,definition:ReportDefinition
   values.san_pham_ban_chay=sales?.products.slice(0,5).map((p,i)=>`${i+1}. ${p.name}: ${p.units} SP · ${p.revenue===null?"Chưa đủ giá bán":p.revenue.toLocaleString("vi-VN")+" "+report.currency}`).join("\n")||"Chưa có dữ liệu sản phẩm.";
   values.nhan_dinh=sales?.signals.slice(0,5).map(s=>s.title+" — "+s.detail).join("\n")||"Chưa đủ dữ liệu để nhận định.";
   values.doi_soat=sales?(sales.complete?`${sales.attribution.matchedOrders} đơn khớp · ${sales.attribution.unmatchedOrders} đơn chưa gán; cơ sở ${sales.basis==="confirmed"?"đã xác nhận":"đã giao"}, theo ngày tạo đơn.`:"Đang đồng bộ; chưa đủ dữ liệu kỳ này."):"";
+  values.TRANG_THAI_DON_HANG=sales?.complete?(sales.statusCounts||[]).filter(s=>s.count>0).map(s=>s.label+" ["+s.code+"]: "+s.count).join("\n")||"Không có đơn trong kỳ.":"Chưa đủ dữ liệu trạng thái.";
   values.thoi_diem_doc=new Date(report.fetchedAt).toLocaleString("vi-VN",{timeZone:"Asia/Ho_Chi_Minh"});
   values.mui_gio=report.timeZone||"Asia/Ho_Chi_Minh";
   const body=definition.body||(sales?"📊 {{ten_nhom}} · {{ky_bao_cao}}\n\n{{chi_so}}\n\nSản phẩm bán chạy\n{{san_pham_ban_chay}}\n\n{{nhan_dinh}}\n\n{{doi_soat}}\nNguồn: {{nguon}}\nĐọc lúc: {{thoi_diem_doc}}":"📊 {{ten_nhom}} · {{ky_bao_cao}}\n\n{{chi_so}}\n\n{{chi_tiet}}\n\n{{so_sanh}}\n\nNguồn: {{nguon}}\nNgày dữ liệu: {{mui_gio}}\nĐọc lúc: {{thoi_diem_doc}}");

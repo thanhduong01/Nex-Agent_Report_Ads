@@ -25,7 +25,7 @@ export async function syncPancake(connectionId:string,shopId:string,now=new Date
   const c=await pancakeConnection(connectionId,shopId),shop=c.shops.find(s=>s.id===shopId)!,store=salesStore();
   const status=await store.status(connectionId,shopId);
   // Only an initial complete import establishes cohort coverage. Incremental overlap handles late updates.
-  const initial=!status.importFrom||!status.reconciledAt||now.getTime()-Date.parse(status.reconciledAt)>86400000;
+  const initial=!status.importFrom||!status.reconciledAt||status.legacyFacts>0||now.getTime()-Date.parse(status.reconciledAt)>86400000;
   const from=initial?new Date(Math.max(Date.parse(status.importFrom||"1970-01-01"),now.getTime()-8*86400000)).toISOString():new Date(Date.parse(status.completeThrough!)-10*60000).toISOString();
   await store.enqueue({connectionId,shopId,currency:shop.currency,from,to:now.toISOString(),mode:initial?"initial":"incremental"});
   const client=new PancakeClient(c.key);

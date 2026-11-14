@@ -2,6 +2,7 @@ import {z} from "zod";
 import {GroupError} from "../groups.ts";
 import {posId} from "./types.ts";
 import type {OrderFact} from "./types.ts";
+import {posMoneyFields} from "../source-catalog.ts";
 
 const amount=z.number().finite().min(0).max(1e14);
 const lineSchema=z.object({product_id:posId,variation_id:posId,quantity:z.number().int().min(0).max(100000),
@@ -24,10 +25,11 @@ export function normalizeOrder(raw:unknown,shopId:string|number,shopCurrency:str
   const o=parsed.data;
   if(o.shop_id!==String(shopId))throw new GroupError("Pancake: đơn hàng nằm ngoài shop đã cấp quyền.",403);
   const currency=o.order_currency||shopCurrency,unit=moneyUnit(currency);
-  return {id:o.id,shopId:o.shop_id,status:o.status,createdAt:utcDate(o.inserted_at),updatedAt:utcDate(o.updated_at),
+  return {version:2,id:o.id,shopId:o.shop_id,status:o.status,createdAt:utcDate(o.inserted_at),updatedAt:utcDate(o.updated_at),
     currency:currency.replace(/100$/,""),adId:o.ad_id||null,
     utmAdId:o.p_utm_content&&/^\d{1,30}$/.test(o.p_utm_content)?o.p_utm_content:null,
     discount:o.total_discount/unit,abandoned:o.is_abandoned_order,removed:o.is_removed,
+    amounts:Object.fromEntries(posMoneyFields.map(field=>{const value=field.field!.split('.').reduce<unknown>((value,key)=>value&&typeof value==='object'?(value as Record<string,unknown>)[key]:undefined,raw);return [field.id,typeof value==="number"&&Number.isFinite(value)&&Math.abs(value)<=1e14?value/unit:null];})),
     lines:o.items.map(l=>{
       if(l.returned_count>l.quantity)throw new GroupError("Pancake: số lượng hoàn vượt số lượng đặt.",502);
       return {productId:l.product_id,variationId:l.variation_id,name:l.variation_info.name,sku:l.variation_info.display_id,

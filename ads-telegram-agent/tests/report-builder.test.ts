@@ -83,7 +83,7 @@ test("builder source switches only require controls for the selected source and 
   await ui.submit("templateForm");
   const saved=ui.calls.find(call=>call.path==="report-definition")!;
   assert.equal(saved.body.revision,7);assert.equal(saved.body.definition.constants.phi,25);
-  assert.deepEqual(saved.body.definition.metrics,["messages","cost","cost_per_message"]);
+  assert.deepEqual(saved.body.definition.metrics,["messages","cost","phones","cost_per_message"]);
   assert.equal(saved.body.definition.source,"sheets");assert.equal(saved.body.definition.connectionId,undefined);
 });
 test("template save refreshes unrelated revisions without discarding the draft or reading state after a committed save",async()=>{
@@ -159,19 +159,37 @@ test("newly saved metric becomes selectable without discarding a dirty template 
   ui.input("tplName","Tên đang chỉnh");
   ui.run('state.metricDefinitions.push({id:"sau_phi",name:"Chi phí sau phí",formula:"chi_phi + phi",scope:"both",unit:"currency",decimals:0}); state.metrics.push(state.metricDefinitions.at(-1)); setupBuilder(state);');
   assert.equal(ui.$("tplName").value,"Tên đang chỉnh");
-  const metricLabels=ui.$("tplMetricList").children.map(row=>row.children[0].children[1].children[0].textContent);
-  assert(metricLabels.includes("Chi phí sau phí"),"New metric must be available while the user's unsaved template stays intact");
+  const metricLabels=ui.$("tplMetricSelect").children.flatMap(group=>group.children).map(option=>option.textContent);
+  assert(metricLabels.some(label=>label.includes("Chi phí sau phí")),"New metric must be available while the user's unsaved template stays intact");
   assert.equal(ui.$("templateSaveState").textContent,"Chưa lưu");
 });
 test("deleting a metric removes its unsaved selection without losing the rest of the template draft",async()=>{
   const ui=client();
   ui.run('state.metricDefinitions.push({id:"sau_phi",name:"After fee",formula:"chi_phi + phi",scope:"both",unit:"currency",decimals:0}); state.metrics.push(state.metricDefinitions.at(-1)); setupBuilder(state);');
-  const row=ui.$("tplMetricList").children.find(row=>row.children[0].children[1].children[0].textContent==="After fee")!;
-  const checkbox=row.children[0].children[0];checkbox.checked=true;checkbox.onchange!();
+  ui.$("tplMetricSelect").value="sau_phi";ui.$("tplAddMetric").onclick!();
   ui.input("tplName","Giữ nội dung đang chỉnh");
   ui.run('state.metricDefinitions=state.metricDefinitions.filter(metric=>metric.id!=="sau_phi"); state.metrics=[]; setupBuilder(state);');
   await ui.submit("templateForm");
   const saved=ui.calls.find(call=>call.path==="report-definition")!;
   assert(!saved.body.definition.metrics.includes("sau_phi"));
   assert.equal(saved.body.name,"Giữ nội dung đang chỉnh");
+});
+
+test('new template owns a fresh identity and creates atomically without changing the previous template',async()=>{
+ const ui=client(async call=>{
+   if(call.path==='state')return ui.scope.state;
+   if(call.path==='report-definition')return {saved:true,revision:8,group:{id:call.body.groupId,name:call.body.name,enabled:false,sources:{},report:call.body.definition}};
+   return {};
+ });
+ const old=JSON.stringify(ui.scope.state.groups[0]);
+ ui.$('builderNewGroup').onclick!();
+ assert.equal(ui.run('builderGroupId'),'test-id');assert.equal(ui.scope.location.hash,'#templates');
+ ui.input('tplName','New report');await ui.submit('templateForm');
+ const request=ui.calls.find(call=>call.path==='report-definition');assert(request);assert.equal(request.body.create,true);assert.equal(request.body.groupId,'test-id');
+ assert.equal(JSON.stringify(ui.scope.state.groups.find((g:any)=>g.id==='tour')),old);
+ assert.equal(ui.scope.state.groups.some((g:any)=>g.id==='test-id'),true);
+});
+test('switching Meta and Pancake preserves selected Meta metrics',()=>{
+ const ui=client();ui.run('builderMetricOrder=["cost","messages","cost_per_message"]');ui.change('tplSource','pancake');
+ assert(ui.run('builderMetricOrder.includes("cost_per_message")'));ui.change('tplSource','meta');assert(ui.run('builderMetricOrder.includes("cost_per_message")'));
 });

@@ -1,4 +1,4 @@
-let editingGroupId, inspectedUrl = "", inspection = [];
+let groupCreating=false, editingGroupId, inspectedUrl = "", inspection = [];
 function currentGroup() { return state.groups.find(group => group.id === editingGroupId); }
 function setupGroups(data) {
   const selected = document.getElementById("reportGroup").value || new URLSearchParams(location.search).get("group") || "default";
@@ -6,7 +6,7 @@ function setupGroups(data) {
     const select = document.getElementById(id); select.replaceChildren(...data.groups.map(group => new Option(group.name, group.id)));
   }
   document.getElementById("reportGroup").value = data.groups.some(g => g.id === selected) ? selected : data.groups[0]?.id || "";
-  editingGroupId = data.groups.some(g => g.id === editingGroupId) ? editingGroupId : document.getElementById("reportGroup").value;
+  if(!groupCreating)editingGroupId = data.groups.some(g => g.id === editingGroupId) ? editingGroupId : document.getElementById("reportGroup").value;
   document.getElementById("settingsGroup").value = editingGroupId;
   document.getElementById("storageStatus").textContent = data.canEditGroups
     ? (data.cloud ? "Cấu hình được lưu riêng tư và có hiệu lực ngay sau khi lưu. Mỗi nhóm có lịch bật/tắt riêng." : "Cấu hình được lưu trên máy. Mỗi nhóm có nguồn và cách đọc chỉ số riêng.")
@@ -17,7 +17,7 @@ function setupGroups(data) {
     : data.scheduler?.checkedAt ? (data.scheduler.healthy ? "Đã kết nối" : "Chưa nhận lần kiểm tra mới") + " · Ghi nhận lúc " + new Date(data.scheduler.checkedAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })
     : "Chưa ghi nhận lần kiểm tra. Xem trạng thái workflow trên GitHub.";
   $("schedulerRuns").href = data.scheduler?.runUrl || data.scheduler?.workflowUrl || "https://github.com/thanhduong01/Nex-Agent_Report_Ads/actions";
-  fillGroup(); updateGroupSchedule();
+  if(!groupCreating)fillGroup(); updateGroupSchedule();
 }
 function updateGroupSchedule() {
   const group = state.groups.find(g => g.id === $("reportGroup").value);
@@ -65,7 +65,7 @@ function fillGroup() {
   $("month").value = state.defaultDate.slice(0, 7); feedback("sourceFeedback");
 }
 function groupPayload() {
-  return { id: editingGroupId, name: $("groupName").value.trim(), enabled: $("groupEnabled").checked, revision: state.revision,
+  return { ...(groupCreating?{create:true}:{}),id: editingGroupId, name: $("groupName").value.trim(), enabled: $("groupEnabled").checked, revision: state.revision,
     schedule: { enabled: $("groupEnabled").checked, time: $("groupTime").value, reportDay: $("groupReportDay").value === "yesterday" ? "yesterday" : "today",
       ...(["last7","month"].includes($("groupReportDay").value)?{period:$("groupReportDay").value}:{}),
       days: [...document.querySelectorAll(".weekdays input:checked")].map(input => Number(input.value)) } };
@@ -128,16 +128,16 @@ function readMappings() {
   });
 }
 document.getElementById("newGroup").onclick = () => {
-  editingGroupId = crypto.randomUUID(); $("settingsGroup").value = ""; fillGroup(); $("groupName").focus();
+  groupCreating=true;editingGroupId = crypto.randomUUID(); $("settingsGroup").value = ""; fillGroup(); $("groupName").focus();
   $("sourceEditor").open = true; feedback("groupFeedback", "Đặt tên nhóm, thêm nguồn và xem thử báo cáo trước khi bật lịch.");
 };
-document.getElementById("settingsGroup").onchange = () => { editingGroupId = $("settingsGroup").value; fillGroup(); };
+document.getElementById("settingsGroup").onchange = () => { groupCreating=false;editingGroupId = $("settingsGroup").value; fillGroup(); };
 document.getElementById("reportGroup").onchange = () => {
   const url = new URL(location.href); url.searchParams.set("group", $("reportGroup").value); history.replaceState(null, "", url); updateGroupSchedule(); loadReport();
 };
 document.getElementById("groupForm").onsubmit = async event => {
   event.preventDefault(); const button = $("groupForm").querySelector("button"); button.disabled = true;
-  try { await api("group", groupPayload()); updateState(await api("state")); feedback("groupFeedback", "Đã lưu nhóm và lịch gửi."); }
+  try { await api("group", groupPayload()); groupCreating=false;updateState(await api("state")); feedback("groupFeedback", "Đã lưu nhóm và lịch gửi."); }
   catch (error) { feedback("groupFeedback", error.message, true); }
   finally { button.disabled = false; }
 };
@@ -150,6 +150,6 @@ document.getElementById("sourceForm").onsubmit = async event => {
     if (!inspectedUrl || inspectedUrl !== $("sheetUrl").value.trim()) throw new Error("Đọc lại các tab trước khi lưu.");
     const mappings = readMappings(); if (!mappings.length) throw new Error("Chọn ít nhất một tab cần báo cáo.");
     await api("group", { ...groupPayload(), source: { month: $("month").value, url: inspectedUrl, mappings } });
-    updateState(await api("state")); feedback("sourceFeedback", "Đã lưu nguồn. Chọn nhóm và ngày ở Báo cáo để xem kết quả.");
+    groupCreating=false;updateState(await api("state")); feedback("sourceFeedback", "Đã lưu nguồn. Chọn nhóm và ngày ở Báo cáo để xem kết quả.");
   } catch (error) { feedback("sourceFeedback", error.message, true); $("saveSource").disabled = !inspectedUrl; }
 };
