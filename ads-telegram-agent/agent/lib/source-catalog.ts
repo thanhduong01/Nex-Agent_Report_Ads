@@ -46,4 +46,4 @@ export const posFields:SourceField[]=[...posMoneyFields,
 ];
 export const sourceFields=[...metaFields,...posFields];
 export const sourceFieldVariables=Object.fromEntries(sourceFields.map(f=>[f.id.toUpperCase(),(f.provider==='meta'?'Meta · ':'POS · ')+f.name]));
-export const sourceFieldMetrics=sourceFields.map(f=>({id:'API_'+f.id.toUpperCase(),name:(f.provider==='meta'?'Meta · ':'POS · ')+f.name,formula:f.id.toUpperCase(),unit:f.unit,decimals:f.unit==='currency'?0:2,scope:'both' as const,provider:f.provider}));
+export const sourceFieldMetrics=sourceFields.map(f=>({id:'API_'+f.id.toUpperCase(),name:(f.provider==='meta'?'Meta · ':'POS · ')+f.name,formula:f.id.toUpperCase(),unit:f.unit,decimals:f.unit==='percent'||/frequency|avg_time|cpc|cpp|cost_per/.test(f.id)?2:0,scope:'both' as const,provider:f.provider}));

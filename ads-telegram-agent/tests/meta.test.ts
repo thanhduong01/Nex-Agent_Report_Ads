@@ -34,6 +34,9 @@ test("Meta connections paginate accounts, keep secrets private and validate acco
   const report=await readMetaInsights({connectionId:"test",accountId:"act_1001",campaignIds:["2001"],messageAction:"onsite_conversion.messaging_conversation_started_7d"},{from:"2026-11-01",to:"2026-11-01"});
   assert.equal(report.rows[0].cost,123);assert.equal(report.rows[0].messages,3);
   assert.equal(report.currency,"VND");
+  const legacy=await readMetaInsights({connectionId:"test",accountId:"act_1001",campaignIds:["2001"],messageAction:"lead",variables:["meta_reach"]},{from:"2026-11-01",to:"2026-11-01"});
+  assert.equal(legacy.summaryMetrics,undefined,"An old lowercase constant must not request a new provider field");
+  assert(!requests.at(-1)!.searchParams.get("fields")!.split(",").includes("reach"));
   await assert.rejects(metaAction({id:"bad",name:"Invalid",token:"https://example.com/token"}),/token/i);
   assert(requests.length>=3);
 });
@@ -62,6 +65,6 @@ test('selected source fields use combined account totals rather than summing rea
   return Response.json({data:[{campaign_id:'2001',campaign_name:'A',spend:'100',impressions:'100',reach:'100',cpc:'2'},{campaign_id:'2002',campaign_name:'B',spend:'200',impressions:'200',reach:'100',cpc:'5'}]});
  };
  await metaAction({id:'test',name:'Test',token:'synthetic_private_token_1234567890'});
- const result=await readMetaInsights({connectionId:'test',accountId:'act_1001',campaignIds:['2001','2002'],messageAction:'lead',variables:['meta_reach','meta_cpc']},{from:'2026-11-14',to:'2026-11-14'});
+ const result=await readMetaInsights({connectionId:'test',accountId:'act_1001',campaignIds:['2001','2002'],messageAction:'lead',variables:['META_REACH','META_CPC']},{from:'2026-11-14',to:'2026-11-14'});
  assert.equal(result.summaryMetrics?.meta_reach,150);assert.equal(result.summaryMetrics?.meta_cpc,3.5);assert.equal(result.rows[0].metrics.meta_reach,100);assert.equal(combined,1);
 });

@@ -128,7 +128,7 @@ export async function readMetaInsights(scope:MetaScope,range:{from:string;to:str
   const {saved,account}=await accessible(scope.connectionId,scope.accountId);
   const campaigns=await metaCampaigns(scope.connectionId,scope.accountId);
   if(scope.campaignIds.some(id=>!campaigns.some(campaign=>campaign.id===id)))throw new GroupError("Meta: campaign không còn thuộc tài khoản đã chọn. Kiểm tra lại phạm vi.");
-  const selected=metaFields.filter(f=>(scope.variables?.includes(f.id.toUpperCase())||scope.variables?.includes(f.id)));
+  const selected=metaFields.filter(f=>scope.variables?.includes(f.id.toUpperCase()));
   const fields=[...new Set(["spend","impressions","inline_link_clicks","actions","action_values",...selected.map(f=>f.field!)])];
   const params={
     time_range:JSON.stringify({since:range.from,until:range.to}),
