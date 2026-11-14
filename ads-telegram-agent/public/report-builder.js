@@ -288,7 +288,6 @@ document.getElementById("tplGroup").onchange=()=>{
 document.getElementById("templateForm").oninput=builderMarkDirty;
 document.getElementById("tplSource").onchange=()=>{
   // Source changes never remove selected metrics; unavailable inputs remain explicit in previews.
-  if($("tplSource").value==="pancake")builderMetricOrder=[...new Set([...builderMetricOrder,"pos_orders","pos_units","pos_revenue","pos_cpa","pos_roas"])];
   builderSourceFields();renderBuilderChoices();builderMarkDirty();
 };
 document.getElementById("tplMessageAction").onchange=builderSourceFields;

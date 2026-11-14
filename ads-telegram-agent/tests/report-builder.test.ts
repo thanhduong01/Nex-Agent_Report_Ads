@@ -191,5 +191,5 @@ test('new template owns a fresh identity and creates atomically without changing
 });
 test('switching Meta and Pancake preserves selected Meta metrics',()=>{
  const ui=client();ui.run('builderMetricOrder=["cost","messages","cost_per_message"]');ui.change('tplSource','pancake');
- assert(ui.run('builderMetricOrder.includes("cost_per_message")'));ui.change('tplSource','meta');assert(ui.run('builderMetricOrder.includes("cost_per_message")'));
+ assert.deepEqual(JSON.parse(ui.run('JSON.stringify(builderMetricOrder)')),["cost","messages","cost_per_message"]);ui.change('tplSource','meta');assert.deepEqual(JSON.parse(ui.run('JSON.stringify(builderMetricOrder)')),["cost","messages","cost_per_message"]);
 });
