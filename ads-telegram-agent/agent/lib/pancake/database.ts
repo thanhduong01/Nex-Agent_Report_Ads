@@ -28,7 +28,18 @@ export function salesDatabase():SqlDatabase {
 export async function databaseHealth() {
   if(!databaseConfigured())return {configured:false,connected:false,message:"Chưa cấu hình DATABASE_URL."};
   try{await salesDatabase().query("SELECT 1 AS ready");return {configured:true,connected:true,message:"Đã kết nối PostgreSQL."};}
-  catch{console.warn("Reporting database connection check failed");return {configured:true,connected:false,message:"Không kết nối được database. Kiểm tra Transaction pooler, mật khẩu và chứng chỉ SSL trong Vercel."};}
+  catch(error){
+    const codes=new Set(["ENOTFOUND","ETIMEDOUT","ECONNREFUSED","ECONNRESET","ENETUNREACH","EHOSTUNREACH","CERT_HAS_EXPIRED","DEPTH_ZERO_SELF_SIGNED_CERT","SELF_SIGNED_CERT_IN_CHAIN","UNABLE_TO_VERIFY_LEAF_SIGNATURE","ERR_TLS_CERT_ALTNAME_INVALID","28P01","3D000","28000"]);
+    const errors=error&&typeof error==="object"&&"errors" in error&&Array.isArray(error.errors)?error.errors:[error];
+    const found=errors.map(e=>e&&typeof e==="object"&&"code" in e?String(e.code):"").find(code=>codes.has(code));
+    const code=found||(error instanceof GroupError?"CONFIGURATION":"OTHER");
+    console.warn("Reporting database connection check failed",{code});
+    const message=code==="28P01"||code==="28000"?"Database từ chối đăng nhập. Kiểm tra username, mật khẩu database đã URL-encode và URI từ Supabase Connect → Transaction pooler.":
+      code==="ENETUNREACH"||code==="EHOSTUNREACH"?"Không truy cập được địa chỉ database. Dùng URI Transaction pooler của Supabase (hỗ trợ IPv4), không dùng Direct connection.":
+      /CERT|SIGNATURE/.test(code)?"Chứng chỉ database chưa được tin cậy. Kiểm tra Transaction pooler hoặc cấu hình CA từ nhà cung cấp vào DATABASE_SSL_CA.":
+      code==="CONFIGURATION"&&error instanceof GroupError?error.message:"Không kết nối được database. Kiểm tra URI Transaction pooler, trạng thái project Supabase và mật khẩu trên Vercel.";
+    return {configured:true,connected:false,code,message};
+  }
 }
 
 // Kept in a private schema, outside Supabase's default public Data API schema.
