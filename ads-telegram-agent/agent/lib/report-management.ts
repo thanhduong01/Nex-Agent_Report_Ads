@@ -7,6 +7,7 @@ import { resolvePeriod } from "./report-period.ts";
 import { vietnamDate } from "./schedule-config.ts";
 import { metaCampaigns } from "./meta.ts";
 import { recordReportRun } from "./report-history.ts";
+import {pancakeConnection} from "./pancake/connections.ts";
 
 function revision(body:Record<string,unknown>) {
   if(!Number.isInteger(body.revision))throw new GroupError("Tải lại cấu hình trước khi lưu.");
@@ -74,6 +75,7 @@ export async function reportManagement(path:string,body:Record<string,unknown>) 
   }
   const definition=validateReportDefinition(body.definition,registry);
   if(path==="/api/report-definition") {
+    if(definition.source==="pancake")await pancakeConnection(definition.pancakeConnectionId!,definition.shopId!);
     if(definition.source!=="sheets") {
       const campaigns=await metaCampaigns(definition.connectionId!,definition.accountId!);
       if(definition.campaignIds.some(id=>!campaigns.some(campaign=>campaign.id===id)))throw new GroupError("Campaign không thuộc tài khoản đã chọn.");

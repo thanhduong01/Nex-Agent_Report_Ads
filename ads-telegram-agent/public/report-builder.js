@@ -51,6 +51,7 @@ function setupBuilder(data) {
     builderSelect($("tplConnection"),data.metaConnections||[],selectedConnection,"Chọn kết nối");
     builderMetricOrder=builderMetricOrder.filter(id=>(data.metricDefinitions||[]).some(metric=>metric.id===id));
     builderAccounts(selectedAccount);renderBuilderChoices();
+    if(typeof fillSalesTemplateShops==="function"){const selectedPos=$("tplPosConnection").value,shop=$("tplPosShop").value;builderSelect($("tplPosConnection"),data.pancakeConnections||[],selectedPos,"Chọn kết nối Pancake");fillSalesTemplateShops(shop);}
   }
   const selectedMetric=metricEditingId||"";
   builderSelect($("metricSaved"),data.metrics||[],selectedMetric,"+ Chỉ số mới");
@@ -76,6 +77,7 @@ function builderAccountInfo() {
 function fillBuilderGroup() {
   const group=state.groups.find(item=>item.id===builderGroupId),definition=group?.report;
   builderBase=builderTemplateVersion(group);
+  if(typeof fillSalesTemplate==="function")fillSalesTemplate(definition);
   $("tplName").value=group?.name||"";
   $("tplSource").value=definition?.source||"sheets";
   builderSelect($("tplConnection"),state.metaConnections||[],definition?.connectionId,"Chọn kết nối");
@@ -101,6 +103,8 @@ function fillBuilderGroup() {
 }
 function builderSourceFields() {
   const source=$("tplSource").value;
+  if($("tplPosFields")){ $("tplPosFields").hidden=source!=="pancake"; for(const id of ["tplPosConnection","tplPosShop","tplPosCpa","tplPosMinimum"]){$(id).required=source==="pancake";} for(const input of $("tplPosFields").querySelectorAll("input,select"))input.disabled=source!=="pancake"; }
+  $("tplComparison").disabled=source==="pancake";if(source==="pancake")$("tplComparison").value="none";
   $("tplMetaFields").hidden=source==="sheets";$("tplPhoneFields").hidden=source!=="hybrid";
   $("tplConnection").required=source!=="sheets";$("tplAccount").required=source!=="sheets";$("tplPhoneProduct").required=source==="hybrid";
   $("tplMessageCustom").hidden=$("tplMessageAction").value!=="custom";
@@ -156,7 +160,7 @@ function renderBuilderChoices() {
     }
     return row;
   }));
-  const variables=["ten_nhom","ky_bao_cao","chi_so","chi_tiet","so_sanh","nguon","thoi_diem_doc","mui_gio",...builderMetricOrder.filter(id=>definitions.find(metric=>metric.id===id)?.scope!=="row")];
+  const variables=["ten_nhom","ky_bao_cao","chi_so","chi_tiet","so_sanh","nguon","thoi_diem_doc","mui_gio","san_pham_ban_chay","nhan_dinh","doi_soat",...builderMetricOrder.filter(id=>definitions.find(metric=>metric.id===id)?.scope!=="row")];
   $("tplPlaceholders").replaceChildren(...variables.map(name=>{const button=el("button","{{"+name+"}}","variableButton");button.type="button";button.onclick=()=>builderInsert($("tplBody"),"{{"+name+"}}");return button;}));
 }
 function templateDraft() {
@@ -167,6 +171,7 @@ function templateDraft() {
   return {source,...(source!=="sheets"?{connectionId:$("tplConnection").value,accountId:$("tplAccount").value,campaignIds:builderCampaignIds,
     messageAction:$("tplMessageAction").value==="custom"?$("tplMessageCustom").value.trim():$("tplMessageAction").value}:{}),
     ...(source==="hybrid"?{phoneSheetName:$("tplPhoneProduct").value}:{}),
+    ...(source==="pancake"?salesTemplateDraft():{}),
     metrics:builderMetricOrder,period:$("tplPeriod").value,comparison:$("tplComparison").value,detail:$("tplDetail").value,
     constants:builderParameters($("tplConstants").value),body:$("tplBody").value.trim()};
 }
@@ -209,7 +214,7 @@ async function loadReportHistory() {
     $("reportHistoryRows").replaceChildren(...response.runs.map(run=>{
       const tr=el("tr"),date=el("td",new Date(run.at).toLocaleString("vi-VN",{timeZone:"Asia/Ho_Chi_Minh"})),group=el("td");
       group.append(el("b",run.groupName),el("small",run.from+" → "+run.to));
-      const source=el("td",({sheets:"Google Sheets",meta:"Meta Ads",hybrid:"Meta + Sheets"})[run.source]||run.source);
+      const source=el("td",({sheets:"Google Sheets",meta:"Meta Ads",hybrid:"Meta + Sheets",pancake:"Meta + Pancake POS"})[run.source]||run.source);
       const status=el("td",({prepared:"Đã chuẩn bị",preview:"Xem trước trên web",failed:"Chưa hoàn tất",sent:"Đã gửi Telegram","already-recorded":"Đã ghi nhận trước"})[run.status]||run.status);
       tr.append(date,group,source,status);return tr;
     }));
@@ -245,6 +250,7 @@ document.getElementById("tplGroup").onchange=()=>{
 document.getElementById("templateForm").oninput=builderMarkDirty;
 document.getElementById("tplSource").onchange=()=>{
   if($("tplSource").value==="meta")builderMetricOrder=builderMetricOrder.filter(id=>!["phones","cost_per_phone","phone_rate"].includes(id));
+  if($("tplSource").value==="pancake")builderMetricOrder=["cost","messages","pos_orders","pos_units","pos_revenue","pos_cpa","pos_roas",...builderMetricOrder.filter(id=>(state.metrics||[]).some(m=>m.id===id))];
   builderSourceFields();renderBuilderChoices();builderMarkDirty();
 };
 document.getElementById("tplMessageAction").onchange=builderSourceFields;
@@ -343,3 +349,5 @@ document.getElementById("formulaTest").onclick=async()=>{
 };
 document.getElementById("reloadHistory").onclick=loadReportHistory;
 window.addEventListener("beforeunload",event=>{if(builderDirty||metricDirty){event.preventDefault();event.returnValue="";}});
+
+if(document.getElementById("tplPosConnection"))document.getElementById("tplPosConnection").onchange=()=>{fillSalesTemplateShops();builderMarkDirty();};

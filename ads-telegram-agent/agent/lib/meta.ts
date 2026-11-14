@@ -2,6 +2,7 @@ import { z } from "zod";
 import { GroupError, getRegistry, hasGroupStorage } from "./groups.ts";
 import { readPrivate, updatePrivate } from "./private-store.ts";
 import { validateDate } from "./report.ts";
+import type {AdIdentity} from "./pancake/types.ts";
 
 export const metaVersion="v26.0";
 const accountSchema=z.object({id:z.string().regex(/^act_\d{1,30}$/),name:z.string().max(200),
@@ -102,6 +103,16 @@ async function accessible(id:string,accountId:string):Promise<{saved:Connection;
   const saved=await connection(id),account=saved.accounts.find(account=>account.id===accountId);
   if(!account)throw new GroupError("Meta: tài khoản không thuộc kết nối được chọn.",403);
   return {saved,account};
+}
+export async function readMetaAdIdentities(connectionId:string,accountId:string,campaignIds:string[]):Promise<AdIdentity[]> {
+  if(!campaignIds.length||campaignIds.length>100||campaignIds.some(id=>!/^\d{1,30}$/.test(id)))throw new GroupError("Chọn phạm vi campaign hợp lệ.");
+  const {saved}=await accessible(connectionId,accountId);
+  const raw=await collection(saved.token,accountId+"/ads",{fields:"id,name,adset_id,campaign{id,name},created_time",
+    filtering:JSON.stringify([{field:"campaign.id",operator:"IN",value:campaignIds}])});
+  const parsed=z.array(z.object({id:z.string().regex(/^\d{1,30}$/),name:z.string().max(500),adset_id:z.string(),
+    campaign:z.object({id:z.string(),name:z.string().max(500)}),created_time:z.string().optional()})).safeParse(raw);
+  if(!parsed.success||parsed.data.some(ad=>!campaignIds.includes(ad.campaign.id)))throw new GroupError("Meta: danh sách quảng cáo không đúng phạm vi.",502);
+  return parsed.data.map(ad=>({id:ad.id,name:ad.name,accountId,adsetId:ad.adset_id,campaignId:ad.campaign.id,campaignName:ad.campaign.name,createdAt:ad.created_time}));
 }
 export async function metaCampaigns(connectionId:string,accountId:string) {
   const {saved}=await accessible(connectionId,accountId);

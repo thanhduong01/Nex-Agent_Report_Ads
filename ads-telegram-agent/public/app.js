@@ -47,12 +47,13 @@ function feedback(id, text = "", error = false) {
   const node = $(id); node.textContent = text; node.classList.toggle("error", error);
 }
 function route() {
-  const selected = ["#settings", "#requests", "#sources", "#templates", "#history"].includes(location.hash) ? location.hash.slice(1) : "report";
-  for (const [view, nav] of [["report", "navReport"], ["settings", "navSettings"], ["requests", "navRequests"],["sources","navSources"],["templates","navTemplates"],["history","navHistory"]]) {
+  const selected = ["#settings", "#requests", "#sources", "#templates", "#history", "#sales"].includes(location.hash) ? location.hash.slice(1) : "report";
+  for (const [view, nav] of [["sales","navSales"],["report", "navReport"], ["settings", "navSettings"], ["requests", "navRequests"],["sources","navSources"],["templates","navTemplates"],["history","navHistory"]]) {
     $(view + "View").hidden = !access || view !== selected;
     if (view === selected) $(nav).setAttribute("aria-current", "page"); else $(nav).removeAttribute("aria-current");
   }
-  document.title = ({ settings: "Kết nối & lịch gửi", requests: "Yêu cầu bot", report: "Báo cáo quảng cáo",sources:"Nguồn dữ liệu",templates:"Mẫu & chỉ số",history:"Lịch sử báo cáo" })[selected] + " · Nex Report Ads Performance";
+  document.title = ({ sales:"Hiệu quả bán hàng", settings: "Kết nối & lịch gửi", requests: "Yêu cầu bot", report: "Báo cáo quảng cáo",sources:"Nguồn dữ liệu",templates:"Mẫu & chỉ số",history:"Lịch sử báo cáo" })[selected] + " · Nex Report Ads Performance";
+  if ($("mobileRoute")) $("mobileRoute").value=selected;
   if (selected === "settings" && access && state) checkTelegram(false);
   if (selected === "history" && access && state && typeof loadReportHistory === "function") loadReportHistory();
 }
@@ -74,6 +75,7 @@ function updateState(data) {
   $("botBadge").className = "pill " + (paired && data.scheduler?.telegramConnected !== false ? "good" : "warn");
   $("token").required = !data.hasToken;
   $("tokenHint").textContent = data.hasToken ? "Để trống để dùng token đã lưu, hoặc nhập token của bot mới." : "Token được lưu trên máy sau khi ghép nối.";
+  if (typeof setupSales === "function") setupSales(data);
   setupGroups(data);
   setupRequests(data);
   setupTelegram(data);
@@ -208,3 +210,5 @@ async function init() {
   }
 }
 init();
+
+if (document.getElementById("mobileRoute")) document.getElementById("mobileRoute").onchange=event=>{location.hash="#"+event.target.value;};

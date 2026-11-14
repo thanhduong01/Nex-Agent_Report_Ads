@@ -13,10 +13,13 @@ import { metaAction, metaCampaigns } from "./meta.ts";
 import { reportManagement } from "./report-management.ts";
 import { reportHistory, recordReportRun } from "./report-history.ts";
 import { limitAdminOperation } from "./admin-rate-limit.ts";
+import {pancakeAction} from "./pancake/api.ts";
+import {pancakeWebhook} from "./pancake/webhook.ts";
 
 export async function dashboardApi(request: Request) {
   const url = new URL(request.url);
   if (url.pathname === "/api/schedule-tick") return schedulerApi(request);
+  if (url.pathname === "/api/pancake-webhook") return pancakeWebhook(request);
   const json = (status: number, body: unknown, extra: Record<string, string> = {}) =>
     Response.json(body, { status, headers: {
       "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...extra,
@@ -42,6 +45,7 @@ export async function dashboardApi(request: Request) {
       return json(200, { ok: true }, { "Set-Cookie": sessionCookie(request) });
     }
     if (!authenticated(request)) return json(401, { code: "login", error: "Đăng nhập để xem báo cáo." });
+    if(isPost&&url.pathname==="/api/pancake"){limitAdminOperation("pancake",20);return json(200,await pancakeAction(body,url.origin));}
     if (isPost && url.pathname === "/api/meta") { limitAdminOperation("meta",10); return json(200,await metaAction(body)); }
     if (isPost && url.pathname === "/api/meta-campaigns") {
       limitAdminOperation("meta-campaigns");

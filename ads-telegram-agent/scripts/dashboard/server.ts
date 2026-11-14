@@ -14,12 +14,13 @@ import { metaAction, metaCampaigns } from "../../agent/lib/meta.ts";
 import { reportManagement } from "../../agent/lib/report-management.ts";
 import { reportHistory, recordReportRun } from "../../agent/lib/report-history.ts";
 import { limitAdminOperation } from "../../agent/lib/admin-rate-limit.ts";
+import {pancakeAction} from "../../agent/lib/pancake/api.ts";
 
 const port = Number(process.env.DASHBOARD_PORT || 4317);
 const host = "127.0.0.1:" + port;
 const origin = "http://" + host;
 const pairing = createPairing();
-const assets = new Map([["/", ["index.html", "text/html"]], ["/style.css", ["style.css", "text/css"]],
+const assets = new Map([["/sales.js",["sales.js","text/javascript"]],["/sales.css",["sales.css","text/css"]],["/", ["index.html", "text/html"]], ["/style.css", ["style.css", "text/css"]],
   ["/telegram.js", ["telegram.js", "text/javascript"]], ["/requests.js", ["requests.js", "text/javascript"]], ["/groups.js", ["groups.js", "text/javascript"]], ["/report-builder.js", ["report-builder.js", "text/javascript"]], ["/app.js", ["app.js", "text/javascript"]], ["/mark.svg", ["mark.svg", "image/svg+xml"]]]);
 const drafts = new Map<string, { text: string; until: number }>();
 const privateChat = () => Boolean(process.env.TELEGRAM_BOT_TOKEN && /^[1-9]\d*$/.test(process.env.TELEGRAM_CHAT_ID || ""));
@@ -68,6 +69,7 @@ const server = createServer(async (req, res) => {
     }
     const data = JSON.parse(body) as Record<string, unknown>;
     if (!data || Array.isArray(data) || typeof data !== "object") return json(400,{error:"Yêu cầu không hợp lệ."});
+    if(url.pathname==="/api/pancake"){limitAdminOperation("pancake",20);return json(200,await pancakeAction(data,origin));}
     if (url.pathname === "/api/meta") { limitAdminOperation("meta",10);return json(200,await metaAction(data)); }
     if (url.pathname === "/api/meta-campaigns") {
       limitAdminOperation("meta-campaigns");

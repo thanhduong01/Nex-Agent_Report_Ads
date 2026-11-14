@@ -4,7 +4,10 @@ export const baseVariables = {
   chi_phi_co_sdt: "Chi phí của sản phẩm có theo dõi SĐT",
   tin_nhan_co_sdt: "Tin nhắn của sản phẩm có theo dõi SĐT",
   hien_thi: "Lượt hiển thị", nhap_lien_ket: "Lượt nhấp liên kết",
-  lead: "Lead trên Meta", don_hang: "Đơn hàng", doanh_thu: "Doanh thu",
+  lead: "Lead trên Meta", don_hang: "Đơn hàng trên Meta", doanh_thu: "Doanh thu quy gán trên Meta",
+  pos_don_hang:"Đơn Pancake theo trạng thái đã chọn",pos_doanh_thu:"Doanh thu hàng hóa Pancake sau hoàn và chiết khấu",
+  pos_so_luong:"Số sản phẩm thương mại giữ lại",pos_don_khop:"Đơn Pancake nối chính xác campaign",pos_doanh_thu_khop:"Doanh thu đơn nối chính xác campaign",
+  pos_cpa_an_toan:"CPA Pancake sau kiểm tra độ phủ, tiền tệ, múi giờ và độ mới",pos_roas_an_toan:"ROAS Pancake sau kiểm tra chất lượng",
 };
 export type FormulaValue = { value: number | null; reason?: string };
 export type MetricExpression = { id: string; formula: string };
@@ -109,7 +112,7 @@ export function calculateFormula(expression:string, values:Record<string,number|
     finite(values[name]!) : missing("Thiếu số liệu: " + name + "."),{left:2048});
 }
 export function validateMetrics(definitions:MetricExpression[], constants:string[] = []) {
-  if(definitions.length>40)fail("tối đa 40 chỉ số.");
+  if(definitions.length>50)fail("tối đa 50 chỉ số.");
   const allowed=new Set([...Object.keys(baseVariables),...constants,"NULL"]);
   const trees=new Map<string,ReturnType<typeof parse>>();
   for(const definition of definitions) {

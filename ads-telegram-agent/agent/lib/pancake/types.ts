@@ -16,7 +16,7 @@ export const salesPolicySchema = z.object({
 export type SalesPolicy = z.infer<typeof salesPolicySchema>;
 export type OrderLine = {productId:string;variationId:string;name:string;sku:string;quantity:number;returned:number;
   price:number|null;discount:number;percent:boolean;gift:boolean;composite:boolean};
-export type OrderFact = {id:string;shopId:string;status:number;createdAt:string;updatedAt:string;currency:string;
+export type OrderFact = {id:string;shopId:string;status:number;createdAt:string;updatedAt:string;currency:string;removed:boolean;
   adId:string|null;utmAdId:string|null;discount:number;abandoned:boolean;lines:OrderLine[]};
 export type AdIdentity = {id:string;accountId:string;campaignId:string;campaignName:string;adsetId:string;name:string;createdAt?:string};
 export type SalesQuality = {syncedAt:string|null;importFrom:string|null;completeThrough:string|null;currency:string;timeZone:string};

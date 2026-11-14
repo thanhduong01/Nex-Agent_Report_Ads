@@ -133,6 +133,7 @@ export type Report = {
   rowMetricValues?: { name: string; metrics: import("./report-service.ts").MetricResult[] }[];
   comparisonValues?: import("./report-service.ts").MetricResult[];
   customText?: string;
+  sales?: import("./pancake/types.ts").SalesReport;
 };
 
 export function buildReport(date: string, byMonth: Record<string, Tables>, source: Source, now = new Date(), readRows = dayRows): Report {

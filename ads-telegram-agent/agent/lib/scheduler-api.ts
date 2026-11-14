@@ -4,11 +4,14 @@ import { scheduledReport } from "./job.ts";
 import { verifySchedulerToken } from "./scheduler-auth.ts";
 import { recordSchedulerCheck } from "./scheduler-status.ts";
 import { connectTelegram } from "./telegram-setup.ts";
+import {syncPancakeTick} from "./pancake/sync.ts";
+import {databaseHealth} from "./pancake/database.ts";
+import {salesStore} from "./pancake/store.ts";
 
 const response = (status: number, body: object) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 const defaults = { verify: verifySchedulerToken, registry: getRegistry, deliver: scheduledReport,
-  record: recordSchedulerCheck, connect: connectTelegram, now: () => new Date() };
-export async function schedulerApi(request: Request, deps = defaults) {
+  record: recordSchedulerCheck, connect: connectTelegram, now: () => new Date(),sync:syncPancakeTick };
+export async function schedulerApi(request: Request, deps:Omit<typeof defaults,"sync"> & {sync?:typeof syncPancakeTick} = defaults) {
   if (request.method !== "POST") return response(405, { error: "Method not allowed" });
   if (process.env.VERCEL_ENV !== "production") return response(403, { error: "Production only" });
   const token = /^Bearer (\S+)$/.exec(request.headers.get("authorization") || "")?.[1];
@@ -25,9 +28,14 @@ export async function schedulerApi(request: Request, deps = defaults) {
     if (text.length > 1024) return response(413, { error: "Request too large" });
     const body = JSON.parse(text);
     if (!body || !["probe", "check", "run"].includes(body.mode)) return response(400, { error: "Invalid scheduler operation" });
-    if (body.mode === "probe") return response(200, { ok: true, provider: "github-actions" });
+    if (body.mode === "probe") {
+      if(deps===defaults){const database=await databaseHealth();if(database.connected)await salesStore().init();console.info("Reporting database health",{configured:database.configured,connected:database.connected});}
+      return response(200, { ok: true, provider: "github-actions" });
+    }
     const now = deps.now();
     if (body.mode === "check") {
+      // POS failures never disable existing Sheets schedules; freshness is visible in each POS report.
+      if(deps.sync)try{await deps.sync();}catch{console.warn("Pancake sync batch could not start");}
       const registry = await deps.registry();
       const due = registry.groups.filter(g => dueOccurrence(effectiveSchedule(g), now)).map(g => g.id);
       let telegramConnected = true;

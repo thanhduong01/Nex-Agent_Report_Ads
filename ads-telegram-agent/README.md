@@ -257,3 +257,32 @@ Nếu cần quay lại bản trước, tắt workflow **Report scheduler** trên
 Trong Kết nối, ứng dụng xác minh token, địa chỉ webhook và quyền truy cập chat riêng bằng Telegram API. Liên kết “Mở @...” dẫn đến đúng bot của token đang triển khai. Sau khi gửi `/help`, bấm kiểm tra kết nối để đọc trạng thái lệnh gần nhất: chưa nhận, bị bỏ qua do chat/người gửi không khớp, đang xử lý, đã gửi, đã ghi nhận hoặc lỗi kho lịch sử/Telegram. Dữ liệu chẩn đoán chỉ lưu thời điểm, giai đoạn và mã nguyên nhân trong Blob riêng tư; không lưu nội dung tin, chat ID hoặc token. “Đã kết nối” xác nhận cấu hình webhook, không tự khẳng định một lệnh đã được trả lời.
 
 Để lấy đúng người nhận sau khi webhook đã kết nối, nhắn `/chatid` trong chat riêng với bot. Lệnh này chỉ trả ID của chính người nhắn, không đọc báo cáo hoặc tự đổi chủ sở hữu. Dùng số bot trả về cho `TELEGRAM_CHAT_ID`, lưu Production và redeploy. Không dùng phần số đứng trước dấu `:` trong bot token vì đó là ID của bot. `/help` và `/baocao` vẫn chỉ được xử lý cho đúng chủ sở hữu đã cấu hình.
+
+## Pancake POS + Meta: đơn thật, sản phẩm và đối soát
+
+Tại **Nguồn dữ liệu**, kiểm tra database, lưu khóa API Pancake cùng ID shop rồi bấm **Đồng bộ tiếp**. Tại **Mẫu & chỉ số**, chọn nguồn **Meta Ads + đơn hàng Pancake POS**, một shop, tài khoản Meta cùng tiền tệ và các campaign cần theo dõi. Các mẫu này được dùng chung trên web, yêu cầu Telegram và lịch gửi GitHub Actions.
+
+### Supabase / PostgreSQL trên Vercel
+
+1. Supabase → **Connect → Transaction pooler**. Sao chép URI thật từ dashboard (thường cổng `6543`), thay mật khẩu và URL-encode ký tự đặc biệt trong mật khẩu.
+2. Lưu URI vào `DATABASE_URL` của Vercel **Production**, rồi redeploy. Không dùng Project URL, anon key hoặc service role key thay URI PostgreSQL. Không đưa URI vào frontend/Git/chat.
+3. Tại Nguồn dữ liệu bấm **Kiểm tra database & tạo bảng**. Tài khoản database cần quyền `CREATE SCHEMA`; các bảng nằm trong schema riêng `nex_reporting`, không phải `public`.
+4. Driver dùng một connection mỗi instance, các truy vấn tham số không đặt tên, transaction cùng client và TLS kiểm tra chứng chỉ. Nếu nhà cung cấp yêu cầu CA riêng, thêm nội dung PEM vào `DATABASE_SSL_CA`; không tắt kiểm tra SSL.
+5. GitHub scheduler vẫn dùng OIDC đã cấu hình; không thêm database password hay Pancake key vào GitHub secrets. Mỗi lần kiểm tra lịch xử lý một số trang đồng bộ có giới hạn; GitHub có thể chạy trễ.
+
+### Cách tính và giới hạn dữ liệu
+
+- Đơn theo **ngày tạo tại Việt Nam**, trạng thái mới nhất đã đồng bộ. Hai cơ sở riêng: đã xác nhận (1,12,13,8,9,2,3,16,15) hoặc đã giao/thu tiền (3,16). Không trộn tiền thu COD với doanh thu hàng hóa.
+- Trừ số lượng trả theo từng dòng một lần. Quà tặng không tạo doanh thu; mặc định loại khỏi số lượng. Combo chỉ tính dòng thương mại, không cộng lại cấu phần.
+- Chiết khấu phân bổ trên dòng trước khi trừ hoàn, giữ tổng tiền khi làm tròn. Chọn đúng quy ước `total_discount` của shop (đã bao gồm giảm từng sản phẩm hay giảm thêm); cần đối chiếu mẫu thực tế trước khi dùng kết luận kinh doanh.
+- Mỗi đơn được nối tối đa một campaign bằng `ad_id` → Meta ad → campaign được cấp quyền. Thiếu ID, UTM mâu thuẫn, không tìm thấy hoặc ngoài phạm vi được thống kê riêng. Không suy đoán bằng tên camp, sản phẩm, số điện thoại hay hội thoại.
+- Tổng đơn/doanh thu shop gồm đơn chưa nối; CPA/ROAS chỉ dùng đơn nối và cùng tiền tệ, múi giờ, độ phủ tối thiểu 80%, cutoff dữ liệu mới tối đa 15 phút. Đơn khác tiền tệ được loại và chặn các tỷ lệ. Nhận định CPA tốt còn cần số đơn tối thiểu và kỳ đã đủ 48 giờ; không tự thay ngân sách.
+- Chưa có lịch sử cùng thời điểm đủ tin cậy thì không công bố tăng trưởng ngày hoặc suy diễn audience/creative insight. Có thể tùy chỉnh các biến `pos_*`, chỉ số và placeholder `{{san_pham_ban_chay}}`, `{{nhan_dinh}}`, `{{doi_soat}}`.
+- Nhập lần đầu 8 ngày gần nhất; dữ liệu cũ hơn chỉ khả dụng khi đã có trong database. Đồng bộ tăng dần theo `updated_at` với overlap 10 phút và cursor thời gian; quét lại cohort 8 ngày mỗi ngày. Không nâng watermark khi lỗi/phân trang chưa xong. Cửa sổ quá nhiều đơn cùng giây được chặn để tránh bỏ sót.
+- Webhook `orders` là tùy chọn: bấm **Hướng dẫn webhook**, đặt URL và header `X-Nex-Webhook-Secret` tại Pancake. Ứng dụng không tự thay webhook đang dùng. Nhận event chỉ lưu shop/order ID vào hàng đợi trước khi trả 202; sau đó đọc lại chi tiết chuẩn từ API.
+- Event lỗi được lùi 15 phút, tối đa 5 lần; không chặn polling các đơn còn lại. Bấm **Thử lại đơn chờ đối chiếu** sau khi sửa quyền/nguồn. Khi còn đơn chưa đối soát, chỉ số bán hàng được giữ chưa khả dụng. Thay đổi cùng timestamp cũng được đưa vào hàng đợi đọc chi tiết để tránh bỏ qua hoàn hàng.
+- Database không lưu tên, số điện thoại, email, địa chỉ, nội dung hội thoại hoặc raw webhook. API key/secret giữ trong kho cấu hình riêng tư; không trả lại API key cho trình duyệt.
+
+### Kiểm chứng trước khi sử dụng doanh thu
+
+Dùng một tập đơn thực tế đại diện tối thiểu 7 ngày, gồm đơn hủy, hoàn một phần/toàn bộ, quà, combo và các quy ước giảm giá; đối chiếu số đơn, số lượng, tiền tệ, doanh thu và độ phủ ID ad với Pancake/Ads Manager. Kiểm thử tự động sử dụng dữ liệu tổng hợp; chưa thay thế bước đối chiếu dữ liệu doanh nghiệp.

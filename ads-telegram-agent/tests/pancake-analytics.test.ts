@@ -29,3 +29,16 @@ test('status/date and partial coverage never invent zero or success; delivered v
  const missing=analyzeSales([],[],spend,policy,range,{...quality,completeThrough:null},new Date('2026-11-14T03:00:00Z'));
  assert.equal(missing.complete,false);assert.equal(missing.totals.orders,null);assert.equal(missing.totals.revenue,null);
 });
+test('gifts never create revenue, item discounts are not subtracted twice, allocation never becomes negative',()=>{
+ const fact=normalizeOrder(raw(1,{total_discount:100,items:[{product_id:'p',variation_id:'p',quantity:1,discount_each_product:100,variation_info:{name:'Paid',retail_price:1000}},{product_id:'g',variation_id:'g',quantity:1,is_bonus_product:true,variation_info:{name:'Gift',retail_price:100}}]}),20,'VND');
+ const r=analyzeSales([fact],[ad],spend,{...policy,includeGifts:true},range,quality,new Date('2026-11-14T03:00:00Z'));
+ assert.equal(r.totals.revenue,900);assert.equal(r.totals.units,2);assert.equal(r.products.find(p=>p.id==='g')?.revenue,0);
+ assert.equal(moneyUnit('PHP'),1);assert.equal(moneyUnit('PHP100'),100);assert.equal(moneyUnit('JPY'),1);assert.equal(moneyUnit('KRW'),100);
+});
+test('a recent job completion does not make an old cutoff fresh; scoped zero-delivery ads still attribute orders',()=>{
+ const fact=normalizeOrder(raw(),20,'VND');
+ const stale=analyzeSales([fact],[ad],spend,policy,range,{...quality,syncedAt:'2026-11-14T10:00:00Z',completeThrough:'2026-11-14T02:00:00Z'},new Date('2026-11-14T10:00:00Z'));
+ assert.equal(stale.quality.stale,true);assert.equal(stale.totals.cpa,null);
+ const zero=analyzeSales([fact],[ad],[],policy,range,quality,new Date('2026-11-14T03:00:00Z'));
+ assert.equal(zero.attribution.matchedOrders,1);assert.equal(zero.campaigns[0].orders,1);assert.equal(zero.campaigns[0].cost,0);assert.equal(zero.campaigns[0].roas,null);
+});

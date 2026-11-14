@@ -10,8 +10,8 @@ const lineSchema=z.object({product_id:posId,variation_id:posId,quantity:z.number
   variation_info:z.object({name:z.string().max(500).default("Sản phẩm"),display_id:z.string().max(100).default(""),retail_price:amount.nullish()}).default({name:"Sản phẩm",display_id:""})});
 const rawSchema=z.object({id:posId,shop_id:posId,status:z.number().int().min(0).max(100),inserted_at:z.string(),updated_at:z.string(),
   order_currency:z.string().regex(/^[A-Z]{3}(100)?$/).optional(),ad_id:posId.nullish(),p_utm_content:z.string().max(500).nullish(),
-  total_discount:amount.default(0),is_abandoned_order:z.boolean().default(false),items:z.array(lineSchema).max(1000)});
-export function moneyUnit(currency:string) {return currency==="VND"?1:100;}
+  total_discount:amount.default(0),is_abandoned_order:z.boolean().default(false),is_removed:z.boolean().default(false),items:z.array(lineSchema).max(1000)});
+export function moneyUnit(currency:string) {return new Set(["VND","TWD","LAK","PHP","MMK","JPY","INR","COP","IDR","CLP","PYG"]).has(currency)?1:100;}
 export function utcDate(value:string) {
   const normalized=/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?$/.test(value)?value+"Z":value;
   if(!/^\d{4}-\d\d-\d\dT.*(?:Z|[+-]\d\d:\d\d)$/.test(normalized)||!Number.isFinite(Date.parse(normalized)))
@@ -25,9 +25,9 @@ export function normalizeOrder(raw:unknown,shopId:string|number,shopCurrency:str
   if(o.shop_id!==String(shopId))throw new GroupError("Pancake: đơn hàng nằm ngoài shop đã cấp quyền.",403);
   const currency=o.order_currency||shopCurrency,unit=moneyUnit(currency);
   return {id:o.id,shopId:o.shop_id,status:o.status,createdAt:utcDate(o.inserted_at),updatedAt:utcDate(o.updated_at),
-    currency:currency==="VND100"?"VND":currency,adId:o.ad_id||null,
+    currency:currency.replace(/100$/,""),adId:o.ad_id||null,
     utmAdId:o.p_utm_content&&/^\d{1,30}$/.test(o.p_utm_content)?o.p_utm_content:null,
-    discount:o.total_discount/unit,abandoned:o.is_abandoned_order,
+    discount:o.total_discount/unit,abandoned:o.is_abandoned_order,removed:o.is_removed,
     lines:o.items.map(l=>{
       if(l.returned_count>l.quantity)throw new GroupError("Pancake: số lượng hoàn vượt số lượng đặt.",502);
       return {productId:l.product_id,variationId:l.variation_id,name:l.variation_info.name,sku:l.variation_info.display_id,

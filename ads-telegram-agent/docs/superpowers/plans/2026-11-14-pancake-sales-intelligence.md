@@ -25,34 +25,34 @@
 ## Task1 — facts and deterministic analytics
 Files: agent/lib/pancake/types.ts, normalize.ts, analytics.ts; tests/pancake-analytics.test.ts.
 Interfaces: normalizeOrder(raw,shop): OrderFact; analyzeSales(orders,ads,spend,policy,range,quality): SalesReport.
-- [ ] RED: currency units, retained lines/gifts/discount rounding, status/time boundaries, ambiguous attribution, zero campaign orders, unavailable source, ratios and insight gates.
-- [ ] Implement validated PII-free facts; deterministic matched campaign and product aggregates, no invented allocation or demographics.
-- [ ] GREEN focused; commit.
+- [x] RED: currency units, retained lines/gifts/discount rounding, status/time boundaries, ambiguous attribution, zero campaign orders, unavailable source, ratios and insight gates.
+- [x] Implement validated PII-free facts; deterministic matched campaign and product aggregates, no invented allocation or demographics.
+- [x] GREEN focused; commit.
 
 ## Task2 — durable SQL store and sync
 Files: agent/lib/pancake/database.ts, store.ts, client.ts, connections.ts, sync.ts, webhook.ts; migrations/001-pancake.sql; tests/pancake-store.test.ts, pancake-sync.test.ts.
 Interfaces: SalesStore upsert/read orders; queue/claim/checkpoint/complete jobs; connection actions; runSyncBatch(store,connection,job), ingestWebhook(request).
-- [ ] RED: real SQL migration/idempotent upserts, duplicate/outdated events, scoped leases, persistent page checkpoint, failure cursor, API pages/redaction/auth, malformed webhooks.
-- [ ] Implement transactional PostgreSQL, pure adapter tests, migration bootstrap; bounded POS read client; page-scoped durable sync with initial7day import, recovery overlap and catalog refresh.
-- [ ] GREEN focused; commit.
+- [x] RED: real SQL migration/idempotent upserts, duplicate/outdated events, scoped leases, persistent page checkpoint, failure cursor, API pages/redaction/auth, malformed webhooks.
+- [x] Implement transactional PostgreSQL, pure adapter tests, migration bootstrap; bounded POS read client; page-scoped durable sync with initial7day import, recovery overlap and catalog refresh.
+- [x] GREEN focused; commit.
 
 ## Task3 — reporting and delivery integration
 Files: existing report-definition/formulas/report-service/report-management/dashboard-state/dashboard-api/scheduler-api, new pancake/api.ts/report.ts, channels/dashboard.ts and scripts/dashboard/server.ts.
 Interfaces: source pancake, pancakeConnectionId/shopId, status/basis thresholds; shared SalesReport DTO under Report.sales, POS base variables/placeholders; API pancake connect/sync/status/report; public-secret webhook.
-- [ ] RED: auth/CSRF, scope/missing DB/no-token leaks, formula/report web/bot consistency and schedule sync without existing schedule regression.
-- [ ] Extend registry schemas and guarded API; consume bounded cached SQL snapshot for all reports; external requests only on sync; scheduler processes pending sync batches within its budget, keeps manual reporting available.
-- [ ] GREEN all existing/new tests; commit.
+- [x] RED: auth/CSRF, scope/missing DB/no-token leaks, formula/report web/bot consistency and schedule sync without existing schedule regression.
+- [x] Extend registry schemas and guarded API; consume bounded cached SQL snapshot for all reports; external requests only on sync; scheduler processes pending sync batches within its budget, keeps manual reporting available.
+- [x] GREEN all existing/new tests; commit.
 
 ## Task4 — responsive real UI
 Files: public/index.html/style.css/app.js/report-builder.js, new public/sales.js/sales.css; real Sources config and product/campaign/matching/signals pages, sales group picker, no demo data; bot settings reuse current request/schedule pages.
-- [ ] Add client-controller tests for routes, scope/date changes, null/error/loading/stale displays, CSRF API payloads and preserved draft saves.
-- [ ] Implement sidebar desktop + labeled mobile nav; summary/campaign/product/reconciliation/insights; sources connection wizard and sync progress, template policy/formulas; retain legacy report.
-- [ ] GREEN controller/HTML checks and browser320/390/768/1024/1440 if an enabled browser tool exists. Report exact limitations if unavailable.
+- [x] Add client-controller tests for routes, scope/date changes, null/error/loading/stale displays, CSRF API payloads and preserved draft saves.
+- [x] Implement sidebar desktop + labeled mobile nav; summary/campaign/product/reconciliation/insights; sources connection wizard and sync progress, template policy/formulas; retain legacy report.
+- [x] GREEN real DOM controller and compiled HTTP checks. Browser unavailable: no visual viewport verification claim.
 - [ ] Commit.
 
 ## Task5 — QA/review/deploy
 - [ ] Test Master integration QA + independent whole-branch review; material fixes RED→GREEN.
-- [ ] Full tests/typecheck/build/JS; migration and compiled route smoke; no secrets/private fixtures in diff.
-- [ ] README secure setup, database prerequisite, sync/attribution rules and troubleshooting.
+- [x] Full94 tests/typecheck/build/JS; PGlite migration and compiled HTTP smoke. No production secrets/private fixtures in diff.
+- [x] README Supabase setup, database prerequisite, sync/attribution rules and troubleshooting.
 - [ ] Push existing authorized GitHub/main, verify Vercel build/deployment logs and production API/assets.
 - [ ] Live Pancake verification only with owner-entered key/shop and database, never ask secrets in chat. No automatic registration/replacement of an existing Pancake webhook.

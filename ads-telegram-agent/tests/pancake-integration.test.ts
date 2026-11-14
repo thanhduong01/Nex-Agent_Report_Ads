@@ -1,0 +1,41 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,rm} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
+import {pancakeWebhook} from '../agent/lib/pancake/webhook.ts';import type {SalesStore} from '../agent/lib/pancake/store.ts';
+import {savePancakeConnection,listPancakeConnections,pancakeConnection} from '../agent/lib/pancake/connections.ts';
+import {createConfiguredReport,renderConfiguredReport} from '../agent/lib/report-service.ts';import {reportDefinitionSchema} from '../agent/lib/report-definition.ts';
+import {salesPolicySchema} from '../agent/lib/pancake/types.ts';import {normalizeOrder} from '../agent/lib/pancake/normalize.ts';import {analyzeSales} from '../agent/lib/pancake/analytics.ts';
+const secret='a'.repeat(64);
+test('webhook authenticates its own secret, enforces shop scope, persists only references before 202 and retries storage failure',async()=>{
+ const calls:unknown[][]=[];let fail=false;
+ const connection={id:'pos',name:'POS',key:'synthetic_private_key',secret,checkedAt:'2026-11-14T00:00:00Z',revision:1,shops:[{id:'20',name:'Shop',currency:'VND'}]};
+ const deps={connection:async()=>connection,store:()=>({event:async(...args:unknown[])=>{if(fail)throw Error('private database error');calls.push(args);}} as unknown as SalesStore)};
+ const request=(body:string,token=secret)=>new Request('https://app.example/api/pancake-webhook?connection=pos',{method:'POST',headers:{'X-Nex-Webhook-Secret':token},body});
+ assert.equal((await pancakeWebhook(request('{}','b'.repeat(64)),deps)).status,401);assert.equal(calls.length,0);
+ assert.equal((await pancakeWebhook(request(JSON.stringify({id:1,shop_id:30})),deps)).status,403);
+ assert.equal((await pancakeWebhook(request('{'),deps)).status,400);
+ const body=JSON.stringify({data:{record:{id:1,shop_id:20,bill_phone_number:'must_never_persist',bill_full_name:'private'}}});
+ assert.equal((await pancakeWebhook(request(body),deps)).status,202);assert.deepEqual(calls,[['pos','20','1']]);
+ fail=true;const response=await pancakeWebhook(request(body),deps);assert.equal(response.status,503);assert(!JSON.stringify(await response.json()).includes('private'));
+});
+test('overlapping connection checks cannot undo a rotated key and public DTO never returns credentials',async t=>{
+ const dir=await mkdtemp(join(tmpdir(),'pos-connection-'));const keys=['PRIVATE_CONFIG_DIR','REPORT_CONFIG_PATH','VERCEL','BLOB_READ_WRITE_TOKEN','BLOB_STORE_ID'];
+ const old=Object.fromEntries(keys.map(k=>[k,process.env[k]])),original=globalThis.fetch;
+ t.after(async()=>{globalThis.fetch=original;for(const k of keys)if(old[k]===undefined)delete process.env[k];else process.env[k]=old[k];await rm(dir,{recursive:true,force:true});});
+ for(const k of keys)delete process.env[k];process.env.PRIVATE_CONFIG_DIR=dir;process.env.REPORT_CONFIG_PATH=join(dir,'groups.json');
+ const k0='synthetic_pancake_key_000',k1='synthetic_pancake_key_111';let slow=false,release:()=>void=()=>{},started:()=>void=()=>{};
+ const reached=new Promise<void>(r=>started=r),pending=new Promise<void>(r=>release=r);
+ globalThis.fetch=async input=>{const u=new URL(String(input));if(slow&&u.searchParams.get('api_key')===k0){started();await pending;}return Response.json({success:true,shop:{id:20,name:'Shop',currency:'VND'}});};
+ await savePancakeConnection({id:'pos',name:'First',shopIds:['20'],key:k0});slow=true;
+ const a=savePancakeConnection({id:'pos',name:'Slow',shopIds:['20'],revision:1});await reached;
+ await savePancakeConnection({id:'pos',name:'New key',shopIds:['20'],key:k1,revision:1});release();await assert.rejects(a,/phiên khác/);
+ assert.equal((await pancakeConnection('pos')).key,k1);const dto=await listPancakeConnections();assert.equal(dto[0].revision,2);assert(!JSON.stringify(dto).includes(k0));assert(!JSON.stringify(dto).includes(k1));
+});
+test('Pancake templates and Telegram rendering use the same fact totals and preserve unavailable sales metrics',async()=>{
+ const definition=reportDefinitionSchema.parse({source:'pancake',connectionId:'meta',accountId:'act_1',campaignIds:['123'],pancakeConnectionId:'pos',shopId:'20',metrics:['cost','pos_orders','pos_units','pos_revenue','pos_cpa'],comparison:'none',body:'{{chi_so}}\n{{san_pham_ban_chay}}\n{{doi_soat}}'});
+ const policy=salesPolicySchema.parse({}),range={from:'2026-11-14',to:'2026-11-14'};
+ const fact=normalizeOrder({id:1,shop_id:20,status:1,inserted_at:'2026-11-14T01:00:00Z',updated_at:'2026-11-14T02:00:00Z',ad_id:'456',items:[{product_id:'p',variation_id:'v',quantity:2,variation_info:{name:'Product',retail_price:100000}}]},20,'VND');
+ const sales=analyzeSales([fact],[{id:'456',accountId:'act_1',adsetId:'a',campaignId:'123',campaignName:'Camp',name:'Ad'}],[{id:'123',name:'Camp',cost:10000,messages:5}],policy,range,{syncedAt:'2026-11-14T03:00:00Z',importFrom:'2026-11-07T00:00:00Z',completeThrough:'2026-11-14T03:00:00Z',currency:'VND',timeZone:'Asia/Ho_Chi_Minh'},new Date('2026-11-14T03:00:00Z'));
+ const group={id:'default',name:'Shop',enabled:true,sources:{},report:definition};const registry={version:1 as const,revision:1,groups:[group],requests:[]};
+ const report=await createConfiguredReport(group,registry,range,{meta:async()=>({rows:[{id:'123',name:'Camp',cost:10000,messages:5,metrics:{hien_thi:100,nhap_lien_ket:5,lead:0,don_hang:10,doanh_thu:999999}}],currency:'VND',timeZone:'Asia/Ho_Chi_Minh',sourceUrl:'https://adsmanager.facebook.com/'}),pancake:async()=>sales});
+ assert.equal(report.metricValues?.find(m=>m.id==='pos_orders')?.value,1);assert.equal(report.metricValues?.find(m=>m.id==='pos_revenue')?.value,200000);
+ const text=renderConfiguredReport(report,definition);assert.match(text,/Product: 2 SP/);assert(!text.includes('999.999'));assert.equal(report.sales?.totals.orders,1);
+});
