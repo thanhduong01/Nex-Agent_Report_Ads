@@ -48,11 +48,11 @@ Files: public/index.html/style.css/app.js/report-builder.js, new public/sales.js
 - [x] Add client-controller tests for routes, scope/date changes, null/error/loading/stale displays, CSRF API payloads and preserved draft saves.
 - [x] Implement sidebar desktop + labeled mobile nav; summary/campaign/product/reconciliation/insights; sources connection wizard and sync progress, template policy/formulas; retain legacy report.
 - [x] GREEN real DOM controller and compiled HTTP checks. Browser unavailable: no visual viewport verification claim.
-- [ ] Commit.
+- [x] Commit.
 
 ## Task5 — QA/review/deploy
-- [ ] Test Master integration QA + independent whole-branch review; material fixes RED→GREEN.
-- [x] Full94 tests/typecheck/build/JS; PGlite migration and compiled HTTP smoke. No production secrets/private fixtures in diff.
+- [x] Test Master inspected integration; independent whole-branch review completed. Findings corrected with root regression tests; no new blocking finding from QA.
+- [x] Full95 tests/typecheck/build/JS; PGlite migration and compiled HTTP smoke. No production secrets/private fixtures in diff.
 - [x] README Supabase setup, database prerequisite, sync/attribution rules and troubleshooting.
-- [ ] Push existing authorized GitHub/main, verify Vercel build/deployment logs and production API/assets.
-- [ ] Live Pancake verification only with owner-entered key/shop and database, never ask secrets in chat. No automatic registration/replacement of an existing Pancake webhook.
+- [x] Pushed authorized GitHub/main. Vercel READY; root/JS/CSS HTTP200 and protected APIs checked. Signed GitHub probe succeeded; database URI validation fails before connection.
+- [ ] Live prerequisite: owner must correct ProductionDATABASE_URL (CONFIGURATION before SQL authentication) and enter Pancake key/shop on web. Secrets never requested in chat; no webhook replaced.

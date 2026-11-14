@@ -65,6 +65,7 @@ export function analyzeSales(orders:OrderFact[],ads:AdIdentity[],spend:CampaignS
     else{const reason=conflicting||candidates.length>1?"ambiguous":!id?"missing_id":"out_of_scope";reasons[reason]++;}
     for(const {line,units:quantity,revenue} of amount){
       const p=products.get(line.productId)||{id:line.productId,name:line.name,sku:line.sku,units:0,orders:0,revenue:0,campaignIds:[]};
+      if(p.sku!==line.sku)p.sku=""; // Aggregated products can contain several variation SKUs.
       p.units+=quantity;p.revenue=p.revenue===null||revenue===null?null:p.revenue+revenue;
       if(camp&&!p.campaignIds.includes(camp.id))p.campaignIds.push(camp.id);
       products.set(line.productId,p);
@@ -72,6 +73,7 @@ export function analyzeSales(orders:OrderFact[],ads:AdIdentity[],spend:CampaignS
     for(const id of new Set(amount.map(l=>l.line.productId)))products.get(id)!.orders++;
   }
   if(excluded.currency)warnings.push("Đã loại "+excluded.currency+" đơn khác tiền tệ; không tính tỷ lệ hiệu quả.");
+  if(revenues.some(value=>value===null))warnings.push("Một số dòng thiếu giá bán hoặc chưa đối chiếu được chiết khấu; doanh thu chưa khả dụng.");
   const coverage=ratio(matched,count),aligned=quality.timeZone==="Asia/Ho_Chi_Minh"&&!excluded.currency;
   const safe=complete&&aligned&&!stale&&coverage!==null&&coverage>=policy.minimumCoverage;
   const totalSpend=sum(spend.map(c=>c.cost));
