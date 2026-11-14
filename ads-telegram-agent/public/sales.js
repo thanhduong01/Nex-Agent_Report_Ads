@@ -67,7 +67,7 @@ async function posOperation(action){
 }
 function renderPosStatus(status){
   const root=$('posSyncStatus');root.replaceChildren();const time=v=>v?new Date(v).toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}):'Chưa có';
-  root.append(el('p','Đơn đang chờ đối chiếu: '+(status.pendingEvents||0)),el('p','Đồng bộ gần nhất: '+time(status.syncedAt)),el('p','Dữ liệu từ: '+time(status.importFrom)),el('p','Đủ đến: '+time(status.completeThrough)));
+  root.append(el('p','Đơn đã nhập: '+(status.orderCount??'Chưa xác định')),el('p','Đơn đang chờ đối chiếu: '+(status.pendingEvents||0)),el('p','Đồng bộ gần nhất: '+time(status.syncedAt)),el('p','Dữ liệu từ: '+time(status.importFrom)),el('p','Đủ đến: '+time(status.completeThrough)));
   const labels={done:'Hoàn tất',running:'Đang chạy',queued:'Đang chờ',failed:'Cần chạy lại'};
   for(const j of status.jobs)root.append(el('p',(labels[j.state]||j.state)+' · trang '+j.page+' · '+(j.mode==='initial'?'nhập dữ liệu':'cập nhật')+(j.error?' · '+j.error:''),'hint'));
   if(status.error)root.append(el('p',status.error,'feedback error'));

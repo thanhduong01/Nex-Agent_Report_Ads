@@ -42,7 +42,8 @@ export class SalesStore {
     await this.init();const result=await this.db.query(`SELECT * FROM nex_reporting.sync_state WHERE connection_id=$1 AND shop_id=$2`,[connectionId,shopId]);
     const row=result.rows[0];const jobs=await this.db.query(`SELECT id,state,page,mode,last_error,created_at FROM nex_reporting.jobs WHERE connection_id=$1 AND shop_id=$2 ORDER BY created_at DESC LIMIT 5`,[connectionId,shopId]);
     const pending=await this.db.query(`SELECT count(*)::integer AS count FROM nex_reporting.events WHERE connection_id=$1 AND shop_id=$2`,[connectionId,shopId]);
-    return {reconciledAt:iso(row?.reconciled_at),pendingEvents:Number(pending.rows[0].count),syncedAt:iso(row?.synced_at),importFrom:iso(row?.import_from),completeThrough:iso(row?.complete_through),currency:row?.currency||null,
+    const orders=await this.db.query(`SELECT count(*)::integer AS count FROM nex_reporting.orders WHERE connection_id=$1 AND shop_id=$2`,[connectionId,shopId]);
+    return {orderCount:Number(orders.rows[0].count),reconciledAt:iso(row?.reconciled_at),pendingEvents:Number(pending.rows[0].count),syncedAt:iso(row?.synced_at),importFrom:iso(row?.import_from),completeThrough:iso(row?.complete_through),currency:row?.currency||null,
       error:row?.last_error||null,jobs:jobs.rows.map(j=>({id:j.id,state:j.state,page:j.page,mode:j.mode,error:j.last_error,createdAt:iso(j.created_at)}))};
   }
   async enqueue(input:{connectionId:string;shopId:string;currency:string;from:string;to:string;mode?:"initial"|"incremental"}){

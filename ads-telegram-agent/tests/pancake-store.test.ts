@@ -20,6 +20,8 @@ test('real SQL migration, scoped order upserts, durable page checkpoints and lea
  assert.equal((await store.orders('pos','20','2026-11-07','2026-11-14'))[0].updatedAt,'2026-11-14T03:00:00.000Z');
  assert.equal((await store.orders('other','20','2026-11-07','2026-11-14')).length,0);
  assert.equal((await store.status('pos','20')).completeThrough,'2026-11-14T03:00:00.000Z');
+ assert.equal((await store.status('pos','20')).orderCount,1);
+ assert.equal((await store.status('other','20')).orderCount,0);
  const equalVersion={...raw('2026-11-14T03:00:00Z'),status:5};await store.upsert('pos',[equalVersion]);
  assert.equal((await store.status('pos','20')).pendingEvents,1);
  const event=(await store.events('pos','20'))[0];assert(event);

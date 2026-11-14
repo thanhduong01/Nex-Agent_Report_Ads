@@ -268,7 +268,7 @@ Tại **Nguồn dữ liệu**, kiểm tra database, lưu khóa API Pancake cùng
 2. Lưu URI vào `DATABASE_URL` của Vercel **Production**, rồi redeploy. Không dùng Project URL, anon key hoặc service role key thay URI PostgreSQL. Không đưa URI vào frontend/Git/chat.
 3. Tại Nguồn dữ liệu bấm **Kiểm tra database & tạo bảng**. Tài khoản database cần quyền `CREATE SCHEMA`; các bảng nằm trong schema riêng `nex_reporting`, không phải `public`.
 4. Driver dùng một connection mỗi instance, các truy vấn tham số không đặt tên, transaction cùng client và TLS kiểm tra chứng chỉ. Nếu nhà cung cấp yêu cầu CA riêng, thêm nội dung PEM vào `DATABASE_SSL_CA`; không tắt kiểm tra SSL.
-5. GitHub scheduler vẫn dùng OIDC đã cấu hình; không thêm database password hay Pancake key vào GitHub secrets. Mỗi lần kiểm tra lịch xử lý một số trang đồng bộ có giới hạn; GitHub có thể chạy trễ.
+5. GitHub scheduler vẫn dùng OIDC đã cấu hình; không thêm database password hay Pancake key vào GitHub secrets. Mỗi lần kiểm tra lịch xử lý một số trang đồng bộ có giới hạn; GitHub có thể chạy trễ. Chế độ `probe` cũng nhập một batch Pancake có giới hạn và ghi số đơn/mốc tiến độ vào log máy chủ; không đọc lịch gửi hoặc gửi Telegram.
 
 ### Cách tính và giới hạn dữ liệu
 

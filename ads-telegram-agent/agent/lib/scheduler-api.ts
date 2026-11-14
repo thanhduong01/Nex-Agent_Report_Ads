@@ -10,8 +10,16 @@ import {salesStore} from "./pancake/store.ts";
 
 const response = (status: number, body: object) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 const defaults = { verify: verifySchedulerToken, registry: getRegistry, deliver: scheduledReport,
-  record: recordSchedulerCheck, connect: connectTelegram, now: () => new Date(),sync:syncPancakeTick };
-export async function schedulerApi(request: Request, deps:Omit<typeof defaults,"sync"> & {sync?:typeof syncPancakeTick} = defaults) {
+  record: recordSchedulerCheck, connect: connectTelegram, now: () => new Date(),sync:syncPancakeTick,
+  probe:async()=>{
+    const database=await databaseHealth();
+    if(database.connected)await salesStore().init();
+    console.info("Reporting database health",{configured:database.configured,connected:database.connected});
+    const pancake=database.connected?await syncPancakeTick():undefined;
+    if(pancake)console.info("Pancake sync probe",pancake);
+    return {database:{configured:database.configured,connected:database.connected},...(pancake?{pancake}:{})};
+  }};
+export async function schedulerApi(request: Request, deps:Omit<typeof defaults,"sync"|"probe"> & {sync?:typeof syncPancakeTick;probe?:()=>Promise<Record<string,unknown>>} = defaults) {
   if (request.method !== "POST") return response(405, { error: "Method not allowed" });
   if (process.env.VERCEL_ENV !== "production") return response(403, { error: "Production only" });
   const token = /^Bearer (\S+)$/.exec(request.headers.get("authorization") || "")?.[1];
@@ -29,8 +37,8 @@ export async function schedulerApi(request: Request, deps:Omit<typeof defaults,"
     const body = JSON.parse(text);
     if (!body || !["probe", "check", "run"].includes(body.mode)) return response(400, { error: "Invalid scheduler operation" });
     if (body.mode === "probe") {
-      if(deps===defaults){const database=await databaseHealth();if(database.connected)await salesStore().init();console.info("Reporting database health",{configured:database.configured,connected:database.connected});}
-      return response(200, { ok: true, provider: "github-actions" });
+      const diagnostic=await deps.probe?.();
+      return response(200, { ok: true, provider: "github-actions",...diagnostic });
     }
     const now = deps.now();
     if (body.mode === "check") {

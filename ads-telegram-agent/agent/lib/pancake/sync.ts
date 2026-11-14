@@ -46,14 +46,24 @@ export async function syncPancake(connectionId:string,shopId:string,now=new Date
   return store.status(connectionId,shopId);
 }
 export async function syncPancakeTick(){
-  if(!databaseConfigured())return {configured:false,processed:0,failed:0};
+  type Detail={connectionId:string;shopId:string;orders?:number;pendingEvents?:number;from?:string|null;through?:string|null;state?:string;page?:number;error?:string};
+  const details:Detail[]=[];
+  if(!databaseConfigured())return {configured:false,processed:0,failed:0,details};
   const connections=await listPancakeConnections();let processed=0,failed=0;const start=Date.now();
   const scopes=connections.flatMap(connection=>connection.shops.map(shop=>({connection,shop})));
   const offset=scopes.length?Math.floor(start/300000)%scopes.length:0;
   const rotated=[...scopes.slice(offset),...scopes.slice(0,offset)];
   for(const {connection,shop} of rotated){
-    if(Date.now()-start>45000)return {configured:true,processed,failed};
-    try{await syncPancake(connection.id,shop.id);processed++;}catch{failed++;console.warn("Pancake sync pending",{connectionId:connection.id,shopId:shop.id});}
+    if(Date.now()-start>45000)break;
+    try{
+      const status=await syncPancake(connection.id,shop.id);processed++;
+      if(details.length<20)details.push({connectionId:connection.id,shopId:shop.id,orders:status.orderCount,pendingEvents:status.pendingEvents,
+        from:status.importFrom,through:status.completeThrough,state:status.jobs[0]?.state,page:status.jobs[0]?.page});
+    }catch(error){
+      failed++;const message=error instanceof GroupError?error.message:"Không hoàn tất đồng bộ. Kiểm tra database và nguồn Pancake.";
+      console.warn("Pancake sync pending",{connectionId:connection.id,shopId:shop.id,error:message});
+      if(details.length<20)details.push({connectionId:connection.id,shopId:shop.id,error:message});
+    }
   }
-  return {configured:true,processed,failed};
+  return {configured:true,processed,failed,details};
 }

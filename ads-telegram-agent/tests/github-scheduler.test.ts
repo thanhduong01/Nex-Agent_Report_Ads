@@ -71,3 +71,18 @@ test("GitHub polls see schedule changes immediately, probe never sends, and inva
   process.env.VERCEL_ENV = "preview";
   assert.equal((await schedulerApi(request({ mode: "check" }), deps)).status, 403);
 });
+
+test('authenticated probe can sync and diagnose POS without reading delivery schedules or invoking Telegram',async t=>{
+  const previous=process.env.VERCEL_ENV;process.env.VERCEL_ENV='production';t.after(()=>{if(previous===undefined)delete process.env.VERCEL_ENV;else process.env.VERCEL_ENV=previous;});
+  let probes=0;
+  const deps={
+    verify:async(token:string)=>{if(token!=='valid')throw Error('bad');return {runId:'123'};},
+    registry:async()=>{throw Error('probe must not read delivery schedules');},
+    deliver:async()=>{throw Error('probe must not deliver reports');},
+    connect:async()=>{throw Error('probe must not register Telegram commands');},record:async()=>{},now:()=>new Date(),
+    probe:async()=>{probes++;return {pancake:{configured:true,processed:1,failed:0,details:[{orders:12,pendingEvents:0}]}};},
+  };
+  const request=(token='valid')=>new Request('https://example.test/api/schedule-tick',{method:'POST',headers:{Authorization:'Bearer '+token},body:JSON.stringify({mode:'probe'})});
+  assert.equal((await schedulerApi(request('bad'),deps)).status,401);assert.equal(probes,0);
+  const response=await schedulerApi(request(),deps),body=await response.json();assert.equal(response.status,200);assert.equal(probes,1);assert.equal(body.pancake.details[0].orders,12);
+});
