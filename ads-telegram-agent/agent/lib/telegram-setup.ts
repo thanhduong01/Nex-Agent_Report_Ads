@@ -57,7 +57,7 @@ export async function connectTelegram(force = false) {
   const url = productionOrigin() + "/eve/v1/telegram";
   if (info.url && info.url !== url) throw new Error(`Bot đang kết nối hệ thống khác. Kiểm tra webhook đang dùng trước khi chuyển sang ${APP_NAME}.`);
   // Do not discard pending messages. The inbound handler ignores stale setup messages.
-  await telegramApi("setWebhook", { url, secret_token: webhookSecret(), allowed_updates: ["message"], max_connections: 2 });
+  await telegramApi("setWebhook", { url, secret_token: webhookSecret(), allowed_updates: ["message", "callback_query"], max_connections: 2 });
   await telegramApi("setMyName", { name: APP_NAME });
   const registry = await getRegistry();
   await telegramApi("setMyCommands", { commands: [

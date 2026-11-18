@@ -1,14 +1,17 @@
 import { getRegistry, GroupError, type ReportGroup, type Registry } from "./groups.ts";
-import { deliverOnce, deliveryKey } from "./delivery.ts";
+import { deliverOnce, deliveryKey, telegramSend } from "./delivery.ts";
 import { effectiveSchedule, nextOccurrence } from "./schedule-config.ts";
 import { productionOrigin } from "./telegram-setup.ts";
 import { defaultRequests, resolveRequest } from "./request-config.ts";
-import { groupsForRequest, requestReport } from "./request-actions.ts";
+import { groupsForRequest, preparedRequestReport } from "./request-actions.ts";
 import { recordTelegramTraffic } from "./telegram-traffic.ts";
 import { DeliveryError } from "./delivery.ts";
 import { APP_NAME } from "./brand.ts";
 import { recordReportRun } from "./report-history.ts";
 import { resolvePeriod } from "./report-period.ts";
+
+import { safeReportKeyboard } from "./telegram-menu.ts";
+import type { MenuReportContext } from "./telegram-menu-context.ts";
 
 const normalize = (value: string) => value.normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/g, "d").toLowerCase().trim();
 export function parseReportCommand(text: string, now = new Date()) {
@@ -62,11 +65,12 @@ export async function handleTelegramCommand(message: CommandMessage, onDelivery?
   const sentAt = message.raw?.date;
   if (typeof sentAt === "number" && sentAt < Date.now() / 1000 - 3600) return;
   const prefix = "command-" + message.messageId;
-  const send = async (part: string, text: string) => {
+  const send = async (part: string, text: string, context?: MenuReportContext) => {
     let sent = false;
     const chunks = text.match(/[\s\S]{1,3900}/g) || [];
     for (const [index, chunk] of chunks.entries()) {
-      const result = await deliverOnce(deliveryKey("telegram", prefix + "-" + part + "-" + index), chunk);
+      const result = await deliverOnce(deliveryKey("telegram", prefix + "-" + part + "-" + index), chunk, undefined, async content => telegramSend(content,
+        context && index === chunks.length - 1 ? await safeReportKeyboard(context, registry) : undefined));
       onDelivery?.(result.status);
       if (result.status === "sent") sent = true;
     }
@@ -104,17 +108,18 @@ export async function handleTelegramCommand(message: CommandMessage, onDelivery?
   catch (error) { await send("group-error", (error as Error).message); return; }
   if (!selected.length) { await send("empty", "Chưa có nhóm nào được cấu hình nguồn. Thêm nguồn trong trang Kết nối."); return; }
   for (const group of selected) {
-    let text, sourceFailed = false;
+    let text, report, sourceFailed = false;
     try {
-      text = await requestReport(parsed!.rule, parsed!.date, group.id, {from:parsed!.from,
+      const prepared = await preparedRequestReport(parsed!.rule, parsed!.date, group.id, {from:parsed!.from,
         ...(parsed!.templatePeriod ? {period:group.report?.period || "today"} : {})});
+      text=prepared.text;report=prepared.report;
     } catch(error) {
       sourceFailed = true;
       text = `Chưa đọc được báo cáo ${group.name} ngày ${parsed!.date}. Kiểm tra nguồn tháng, quyền chia sẻ và các cột trong trang Kết nối.`;
       if(error instanceof GroupError) text += "\n" + error.message;
     }
-    const status=await send(group.id, text);
     const range=resolvePeriod(parsed!.date,parsed!.templatePeriod ? group.report?.period || "today" : "today",parsed!.from);
+    const status=await send(group.id, text,sourceFailed?undefined:{groupId:group.id,from:range.from,to:range.to,requestId:parsed!.rule.id,legacy:!report?.metricValues});
     await recordReportRun({groupId:group.id,groupName:group.name,from:range.from,to:range.to,source:group.report?.source||"sheets",status:sourceFailed?"failed":status,mode:"bot"});
   }
 }

@@ -16,13 +16,17 @@ import { reportHistory, recordReportRun } from "../../agent/lib/report-history.t
 import { limitAdminOperation } from "../../agent/lib/admin-rate-limit.ts";
 import {pancakeAction} from "../../agent/lib/pancake/api.ts";
 
+import { safeReportKeyboard } from "../../agent/lib/telegram-menu.ts";
+import { menuAction } from "../../agent/lib/telegram-menu-actions.ts";
+import type { MenuReportContext } from "../../agent/lib/telegram-menu-context.ts";
+
 const port = Number(process.env.DASHBOARD_PORT || 4317);
 const host = "127.0.0.1:" + port;
 const origin = "http://" + host;
 const pairing = createPairing();
 const assets = new Map([["/sales.js",["sales.js","text/javascript"]],["/sales.css",["sales.css","text/css"]],["/", ["index.html", "text/html"]], ["/style.css", ["style.css", "text/css"]],
-  ["/telegram.js", ["telegram.js", "text/javascript"]], ["/requests.js", ["requests.js", "text/javascript"]], ["/groups.js", ["groups.js", "text/javascript"]], ["/report-builder.js", ["report-builder.js", "text/javascript"]], ["/app.js", ["app.js", "text/javascript"]], ["/mark.svg", ["mark.svg", "image/svg+xml"]]]);
-const drafts = new Map<string, { text: string; until: number }>();
+  ["/telegram-menu.js", ["telegram-menu.js", "text/javascript"]], ["/telegram.js", ["telegram.js", "text/javascript"]], ["/requests.js", ["requests.js", "text/javascript"]], ["/groups.js", ["groups.js", "text/javascript"]], ["/report-builder.js", ["report-builder.js", "text/javascript"]], ["/app.js", ["app.js", "text/javascript"]], ["/mark.svg", ["mark.svg", "image/svg+xml"]]]);
+const drafts = new Map<string, { text: string; until: number;context:MenuReportContext }>();
 const privateChat = () => Boolean(process.env.TELEGRAM_BOT_TOKEN && /^[1-9]\d*$/.test(process.env.TELEGRAM_CHAT_ID || ""));
 function status() {
   return dashboardState();
@@ -57,7 +61,7 @@ const server = createServer(async (req, res) => {
       const id = randomUUID();
       for (const [key, entry] of drafts) if (entry.until < Date.now()) drafts.delete(key);
       if (drafts.size >= 50) drafts.delete(drafts.keys().next().value!);
-      drafts.set(id, { text, until: Date.now() + 30 * 60000 });
+      drafts.set(id, { text, context:{groupId:report.groupId||url.searchParams.get("group")||"default",from:report.range?.from||date,to:date,legacy:!report.metricValues}, until: Date.now() + 30 * 60000 });
       return json(200, { report, text, id });
     }
     if (req.method !== "POST" || req.headers.origin !== origin || req.headers["content-type"] !== "application/json")
@@ -79,6 +83,7 @@ const server = createServer(async (req, res) => {
     if (["/api/metric","/api/formula-preview","/api/report-definition","/api/template-preview"].includes(url.pathname)) {
       limitAdminOperation(url.pathname);return json(200,await reportManagement(url.pathname,data));
     }
+    if(url.pathname==="/api/telegram-menu"){limitAdminOperation("telegram-menu",20);return json(200,await menuAction(data));}
     const field = (name: string) => typeof data[name] === "string" ? data[name] : "";
     if (["/api/request", "/api/request-preview"].includes(url.pathname)) return json(200, await requestAction(url.pathname, data));
     if (["/api/inspect", "/api/group"].includes(url.pathname)) return json(200, await groupAction(url.pathname, data));
@@ -100,7 +105,7 @@ const server = createServer(async (req, res) => {
       const key = field("id"), entry = drafts.get(key);
       if (!entry || entry.until < Date.now()) throw new Error("Bản xem trước đã hết hạn hoặc đã dùng. Tải lại báo cáo và kiểm tra chat trước khi gửi tiếp.");
       drafts.delete(key);
-      try { return json(200, { messageId: await telegramSend("BẢN GỬI THỬ\n\n" + entry.text) }); }
+      try { return json(200, { messageId: await telegramSend("BẢN GỬI THỬ\n\n" + entry.text,await safeReportKeyboard(entry.context)) }); }
       catch (e) { if (e instanceof DeliveryError && e.definitelyRejected) drafts.set(key, entry); throw e; }
     }
     return json(404, { error: "Không tìm thấy thao tác." });

@@ -23,25 +23,25 @@
 ### Task 1: Configuration and context contract
 Files: agent/lib/telegram-menu-config.ts, telegram-menu-context.ts, groups.ts; tests/telegram-menu.test.ts.
 Produces: menu schema/defaults, menuAction(body), signed immutable context write/read, pure keyboard layout.
-- [ ] Write failing tests for schema/reference validation, CAS preservation, owner-bound signatures, tampering, expiry and 64-byte limit.
-- [ ] Run node --test tests/telegram-menu.test.ts; confirm missing feature failures.
-- [ ] Implement schemas, context storage and token validation; run tests and typecheck.
+- [x] Write failing tests for schema/reference validation, CAS preservation, owner-bound signatures, tampering, expiry and 64-byte limit.
+- [x] Run node --test tests/telegram-menu.test.ts; confirm missing feature failures.
+- [x] Implement schemas, context storage and token validation; run tests and typecheck.
 
 ### Task 2: Callback execution and shared delivery
 Files: agent/lib/telegram-menu.ts, telegram-menu-callbacks.ts, delivery.ts, job.ts, telegram-commands.ts, telegram-setup.ts, dashboard-api.ts, scripts/dashboard/server.ts, agent/channels/telegram.ts.
 Consumes: Task 1 contracts. Produces keyboard(report context), handle callback with injected QA boundaries.
-- [ ] Write failing action tests for auth, scope drift, duplicate delivery, supported views, custom dates and explicit date ranges.
-- [ ] Implement report menus, preset/group submenus, request handler, view rendering; attach to command/scheduled/manual report delivery.
-- [ ] Include callback_query in webhook setup; run old command/delivery/scheduler tests and new action tests.
+- [x] Write failing action tests for auth, scope drift, duplicate delivery, supported views, custom dates and explicit date ranges.
+- [x] Implement report menus, preset/group submenus, request handler, view rendering; attach to command/scheduled/manual report delivery.
+- [x] Include callback_query in webhook setup; run old command/delivery/scheduler tests and new action tests.
 
 ### Task 3: Web configuration
 Files: public/telegram-menu.js, index.html, app.js, sales.css; dashboard-state.ts and both API routers; scripts/build-vercel.mjs.
 Consumes: registry.telegramMenu and menuAction. Produces responsive menu editor and preview.
-- [ ] Write failing real-DOM tests for independent edit/save/reorder/remove, retained dirty drafts and safe Unicode preview.
-- [ ] Add controls, accessible labels, source/request choices, mobile layout and guarded API save.
-- [ ] Run DOM/API tests, all tests, typecheck and production build.
+- [x] Write failing real-DOM tests for independent edit/save/reorder/remove, retained dirty drafts and safe Unicode preview.
+- [x] Add controls, accessible labels, source/request choices, mobile layout and guarded API save.
+- [x] Run DOM/API tests, all tests, typecheck and production build.
 
 ### Task 4: QA and release
-- [ ] Hand off full diff to fresh Test Master/reviewer per Fullstack Guardian; address verified important findings with regression tests.
+- [x] Hand off full diff to fresh Test Master/reviewer per Fullstack Guardian; address verified important findings with regression tests.
 - [ ] Run full suite, compiled HTTP/auth/static asset checks and document browser limitations.
 - [ ] Commit, integrate into authorized main, push and verify production deploy + scheduler/webhook registration.

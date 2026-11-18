@@ -1,6 +1,6 @@
 import {z} from 'zod';
+import type { BotRequest } from './request-config.ts';
 import {createHash} from 'node:crypto';
-import {getRegistry,updateRegistry,GroupError,type Registry} from './groups.ts';
 const id=z.string().regex(/^[a-z0-9-]{1,64}$/);
 export const menuButtonSchema=z.object({
  id:id.max(32),label:z.string().trim().min(1).max(48),enabled:z.boolean(),
@@ -24,28 +24,11 @@ export function defaultMenu():TelegramMenu {
   ['reconciliation','🔎 Đối soát'],['insights','💡 Nhận định'],['groups','🗂 Đổi nhóm'],['settings','⚙️ Cài lịch gửi'],['web','🌐 Mở báo cáo trên web'],
  ].map(([action,label])=>({id:action,action,label,enabled:true,fullRow:action==='web'}))});
 }
-export function validateMenu(input:unknown,registry:Registry):TelegramMenu {
- const parsed=menuSchema.safeParse(input);
- if(!parsed.success)throw new GroupError('Kiểm tra tên nút, hành động, nhóm và liên kết HTTPS. Tối đa 20 nút, 48 ký tự mỗi tên.');
- for(const b of parsed.data.buttons){
-  if(b.action==='request'&&!registry.requests.some(r=>r.id===b.requestId))throw new GroupError('Yêu cầu đã thay đổi. Chọn lại yêu cầu cho nút.');
-  if(b.groupMode==='fixed'&&!registry.groups.some(g=>g.id===b.groupId))throw new GroupError('Nhóm đã thay đổi. Chọn lại nhóm cho nút.');
-  const rule=registry.requests.find(r=>r.id===b.requestId);
-  if(b.action==='request'&&b.groupMode==='fixed'&&rule?.groupMode==='selected'&&!rule.groupIds.includes(b.groupId!))throw new GroupError('Nhóm của nút không thuộc phạm vi yêu cầu.');
-  if(b.action==='request'&&rule&&!rule.allowDate&&!['request'].includes(b.dateMode))throw new GroupError('Yêu cầu không cho chọn ngày. Chọn ngày theo yêu cầu đã lưu.');
- }
- return parsed.data;
-}
-export async function menuAction(body:Record<string,unknown>){
- if(!Number.isInteger(body.revision))throw new GroupError('Tải lại cấu hình trước khi lưu.');
- const registry=await getRegistry(),menu=validateMenu(body.menu,registry);
- const saved=await updateRegistry(body.revision as number,draft=>{draft.telegramMenu=validateMenu(menu,draft);});
- console.info('Đã cập nhật nút Telegram, phiên bản:',saved.revision);
- return {saved:true,revision:saved.revision};
-}
 export const buttonFingerprint=(button:MenuButton)=>createHash('sha256').update(JSON.stringify(button)).digest('hex').slice(0,24);
 export function layoutButtons<T extends {fullRow?:boolean}>(buttons:T[],columns:number):T[][]{
  const rows:T[][]=[];let row:T[]=[];
  for(const b of buttons){if(b.fullRow){if(row.length)rows.push(row);rows.push([b]);row=[];}else{row.push(b);if(row.length===columns){rows.push(row);row=[];}}}
  if(row.length)rows.push(row);return rows;
 }
+
+export const requestFingerprint=(rule:BotRequest)=>createHash('sha256').update(JSON.stringify(rule)).digest('hex').slice(0,24);

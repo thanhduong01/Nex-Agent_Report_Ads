@@ -102,3 +102,31 @@ section, aside, form, fieldset, .sectionLine > *, .mappingGrid > * { min-width:0
 .valueMapEditor { margin:18px 0; }
 .valueMapEditor textarea { margin-top:8px; }
 @container (max-width:640px) { .pickerRow { grid-template-columns:minmax(0,1fr); } .pickerRow button { width:100%; } }
+/* Telegram menu editor is scoped to the requests screen. */
+.menuWorkspace { display:grid; grid-template-columns:minmax(0,1fr) minmax(280px,.7fr); align-items:start; gap:24px; }
+.menuWorkspace > *, .menuCardFields > *, .menuGeneral > * { min-width:0; }
+.menuEditor, .menuPreview .panel { padding:24px; }
+#menuFields { border:0; margin:0; padding:0; min-width:0; }
+.menuGeneral { display:grid; grid-template-columns:minmax(0,1fr) minmax(120px,.5fr); gap:16px; align-items:center; margin-bottom:24px; }
+.menuButtonCard { border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:14px; min-width:0; }
+.menuButtonHead { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
+.menuButtonHead .checkLabel { margin:0; }
+.menuOrderActions { display:flex; flex-wrap:wrap; gap:6px; }
+.menuOrderActions button { min-height:44px; min-width:44px; padding:8px 10px; }
+.menuCardFields { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; }
+.menuCardFields label { font-size:13px; margin:0; }
+.menuCardFields input, .menuCardFields select { width:100%; min-width:0; max-width:100%; margin:6px 0 8px; font-size:14px; }
+.menuPreview { min-width:0; }
+.menuPreview h2 { font-size:20px; }
+.menuTelegramCanvas { background:#17212b; padding:14px; border-radius:14px; margin-top:18px; color:#fff; min-width:0; }
+.menuReportBubble { display:flex; flex-direction:column; gap:12px; background:#232f3d; padding:16px; border-radius:12px; font-size:14px; overflow-wrap:anywhere; }
+.menuReportBubble b { font-size:13px; color:#b7cafa; }
+.menuReportBubble small { color:#b9c8d9; }
+.menuKeyboardRow { display:grid; grid-template-columns:minmax(0,1fr); gap:6px; margin-top:6px; min-width:0; }
+.menuKeyboardRow[data-columns="2"] { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.menuKeyboardRow[data-columns="3"] { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.menuPreviewButton { min-width:0; width:100%; min-height:44px; white-space:normal; overflow-wrap:anywhere; color:#fff; background:#2b3c4e; border:1px solid #3c5067; border-radius:8px; padding:12px 8px; font-size:14px; line-height:1.4; }
+.menuPreviewButton:hover { background:#354d66; }
+.menuTelegramCanvas .hint { color:#c8d3e1; }
+@container (max-width:1050px) { .menuWorkspace { grid-template-columns:minmax(0,1fr); } .menuPreview { max-width:600px; width:100%; } }
+@container (max-width:600px) { .menuEditor, .menuPreview .panel { padding:16px; } .menuCardFields,.menuGeneral { grid-template-columns:minmax(0,1fr); } .menuButtonCard { padding:12px; } }

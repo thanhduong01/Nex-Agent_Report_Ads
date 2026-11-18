@@ -26,9 +26,12 @@ export function groupsForRequest(groups: ReportGroup[], rule: BotRequest, input 
   if (selected.length !== 1) throw new GroupError("Nhóm này không thuộc yêu cầu. Kiểm tra tên nhóm hoặc cấu hình trên web.");
   return selected;
 }
-export async function requestReport(rule: BotRequest, date: string, groupId: string, options: ReportOptions = {}) {
+export async function preparedRequestReport(rule: BotRequest, date: string, groupId: string, options: ReportOptions = {}) {
   const { report, text } = await prepareReport(date, groupId, {...options, summary:rule.format === "summary"});
-  return formatRequestReport(rule, report, text);
+  return {report,text:formatRequestReport(rule, report, text)};
+}
+export async function requestReport(rule: BotRequest, date: string, groupId: string, options: ReportOptions = {}) {
+  return (await preparedRequestReport(rule,date,groupId,options)).text;
 }
 export function formatRequestReport(rule: BotRequest, report: Report, text: string) {
   const date = report.date;

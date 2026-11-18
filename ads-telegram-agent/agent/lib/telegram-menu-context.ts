@@ -8,7 +8,7 @@ import {readBlobJson} from './blob-json.ts';
 import {botToken} from './telegram-token.ts';
 import {resolvePeriod} from './report-period.ts';
 const id=z.string().regex(/^[a-z0-9-]{1,64}$/);
-export const reportContextSchema=z.object({groupId:id,from:z.string(),to:z.string(),requestId:id.optional()});
+export const reportContextSchema=z.object({groupId:id,from:z.string(),to:z.string(),requestId:id.optional(),requestFingerprint:z.string().regex(/^[a-f0-9]{24}$/).optional(),legacy:z.boolean().optional()});
 export type MenuReportContext=z.infer<typeof reportContextSchema>;
 const intentSchema=z.object({kind:z.enum(['button','period','group','back','custom-date']),buttonId:id,fingerprint:z.string().max(64),value:z.string().max(64).optional()});
 export type MenuIntent=z.infer<typeof intentSchema>;

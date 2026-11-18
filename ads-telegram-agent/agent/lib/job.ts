@@ -1,6 +1,6 @@
 import { getRegistry } from "./groups.ts";
 import { generateText } from "ai";
-import { deliverOnce, deliveryKey } from "./delivery.ts";
+import { deliverOnce, deliveryKey, telegramSend } from "./delivery.ts";
 import { configuredReport } from "./report-service.ts";
 import type { ReportOptions } from "./report-service.ts";
 import { renderReport } from "./report.ts";
@@ -8,6 +8,8 @@ import type { Report } from "./report.ts";
 import { dueOccurrence, effectiveSchedule } from "./schedule-config.ts";
 import { APP_NAME } from "./brand.ts";
 import { recordReportRun } from "./report-history.ts";
+
+import { safeReportKeyboard } from "./telegram-menu.ts";
 
 async function analysis(report: Report): Promise<string> {
   if (process.env.AI_ENABLED !== "true") return "";
@@ -41,7 +43,9 @@ export async function scheduledReport(now = new Date(), groupId?: string) {
     const date = occurrence.reportDate;
     const kind = "scheduled-" + group.id + "-" + occurrence.key;
     try {
-      const delivered=await deliverOnce(deliveryKey(date, kind), async () => (await prepareReport(date, group.id, {from: occurrence.from})).text);
+      let legacy=false;
+      const delivered=await deliverOnce(deliveryKey(date, kind), async () => {const prepared=await prepareReport(date,group.id,{from:occurrence.from});legacy=!prepared.report.metricValues;return prepared.text;}, undefined, async text => telegramSend(text,
+        await safeReportKeyboard({groupId:group.id,from:occurrence.from||date,to:date,legacy},registry)));
       results.push({ groupId: group.id, ...delivered });
       if(delivered.status==="sent")await recordReportRun({groupId:group.id,groupName:group.name,from:occurrence.from||date,to:date,source:group.report?.source||"sheets",status:"sent",mode:"schedule"});
     } catch {

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Nex Report Ads Performance · Báo cáo quảng cáo</title><link rel="icon" href="/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css?v=pos-20261114"><link rel="stylesheet" href="/sales.css?v=catalog-20261115"><script src="/sales.js?v=catalog-20261115" defer></script><script src="/groups.js?v=catalog-20261115" defer></script><script src="/requests.js?v=meta-1" defer></script><script src="/telegram.js?v=20261106-brand" defer></script><script src="/report-builder.js?v=catalog-20261115" defer></script><script src="/app.js?v=catalog-20261115" defer></script></head>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Nex Report Ads Performance · Báo cáo quảng cáo</title><link rel="icon" href="/mark.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css?v=pos-20261114"><link rel="stylesheet" href="/sales.css?v=menus-20261118"><script src="/sales.js?v=catalog-20261115" defer></script><script src="/groups.js?v=catalog-20261115" defer></script><script src="/requests.js?v=meta-1" defer></script><script src="/telegram-menu.js?v=menus-20261118" defer></script><script src="/telegram.js?v=20261106-brand" defer></script><script src="/report-builder.js?v=catalog-20261115" defer></script><script src="/app.js?v=menus-20261118" defer></script></head>
 <body>
 <svg xmlns="http://www.w3.org/2000/svg" class="definitions" aria-hidden="true"><defs>
 <symbol id="i-report" viewBox="0 0 24 24"><path d="M4 4v16h16M8 15v-4m5 4V6m5 9v-6"/></symbol>
@@ -73,7 +73,8 @@
 </section>
 <section id="requestsView" aria-labelledby="requestsTitle" hidden>
 <div class="headline"><div><div class="eyebrow"><i></i>BẠN NHẮN · BOT LẤY BÁO CÁO</div><h1 id="requestsTitle">Yêu cầu bot</h1><p>Đặt lệnh và câu yêu cầu, chọn số liệu bot sẽ trả về.</p></div><a href="#settings" class="secondary requestScheduleLink"><svg class="icon"><use href="#i-clock"/></svg>Cài lịch gửi tự động</a></div>
-<div class="requestWorkspace">
+<div class="salesTabs" aria-label="Cấu hình bot"><button type="button" id="commandTab" aria-pressed="true">Lệnh &amp; câu yêu cầu</button><button type="button" id="menuTab" aria-pressed="false">Nút dưới báo cáo</button></div>
+<div class="requestWorkspace" id="requestCommandsPanel">
 <aside class="requestLibrary" aria-label="Yêu cầu đã lưu"><div class="sectionLine"><h2>Đã cấu hình</h2><span id="requestCount" class="pill">0</span></div><div id="requestList"></div><button id="newRequest" class="secondary wide">+ Tạo yêu cầu</button><p class="hint">Bot chỉ nhận yêu cầu từ chat riêng đã kết nối.</p></aside>
 <section class="panel requestEditor" aria-labelledby="requestEditorTitle">
 <div class="sectionLine"><h2 id="requestEditorTitle">Chỉnh yêu cầu</h2><span id="requestSaveState" class="pill">Đã lưu</span></div>
@@ -94,7 +95,15 @@
 <aside class="requestPreview" aria-labelledby="requestPreviewTitle"><div class="sectionLine"><h2 id="requestPreviewTitle">Chạy thử</h2><span class="pill">Trên web</span></div><p class="hint">Đọc số liệu thật từ nguồn của nhóm báo cáo. Chưa gửi tin nhắn đến Telegram.</p>
 <form id="requestTestForm"><label for="reqTestMessage">Tin nhắn gửi bot</label><input id="reqTestMessage" maxlength="250" required autocomplete="off" spellcheck="false"><button id="testRequest" class="secondary wide">Chạy thử yêu cầu<svg class="icon"><use href="#i-arrow"/></svg></button></form>
 <div class="telegramPreview"><div class="previewBot"><span class="roundIcon"><svg class="icon"><use href="#i-plane"/></svg></span><div><b>Nex Report Ads Performance</b><small>Bản xem thử</small></div></div><div id="requestConversation" aria-live="polite"><p class="previewEmpty">Nhập lệnh hoặc câu yêu cầu phía trên để xem bot sẽ trả lời thế nào.</p></div></div><p id="requestTestFeedback" class="feedback" role="status"></p>
-</aside></div></section>
+</aside></div>
+<div id="telegramMenuPanel" hidden>
+<div class="menuWorkspace">
+<section class="panel menuEditor" aria-labelledby="menuTitle"><div class="sectionLine"><h2 id="menuTitle">Nút dưới báo cáo</h2><span class="pill" id="menuDirty">Đã lưu</span></div><p class="hint">Dùng cho báo cáo theo lệnh, lịch gửi và gửi thử. Nút giữ nhóm và kỳ đang xem. Những nút cần Meta hoặc POS chỉ hiện với nguồn phù hợp.</p>
+<form id="telegramMenuForm"><fieldset id="menuFields"><div class="menuGeneral"><label class="checkLabel"><input type="checkbox" id="menuEnabled">Bật nút dưới báo cáo</label><label for="menuColumns">Số nút mỗi hàng<select id="menuColumns"><option value="1">1 nút</option><option value="2">2 nút</option><option value="3">3 nút</option></select></label></div>
+<div class="sectionLine"><h3>Thứ tự &amp; hành động</h3><span id="menuButtonCount" class="pill"></span></div><div id="menuButtonList"></div><button type="button" id="menuAdd" class="secondary">+ Thêm nút</button></fieldset>
+<div class="builderActions"><button type="submit" id="menuSave" class="primary">Lưu menu Telegram</button><button type="button" id="menuReload" class="secondary">Tải cấu hình mới</button></div><p id="menuFeedback" class="feedback" role="status" aria-live="polite"></p></form></section>
+<aside class="menuPreview"><section class="panel"><h2>Xem trước trong Telegram</h2><label for="menuPreviewGroup">Nguồn của nhóm xem thử</label><select id="menuPreviewGroup"></select><p class="hint">Các nút là bản mô phỏng. Bấm để xem hành động, chưa gửi tin nhắn.</p><div class="menuTelegramCanvas"><div class="menuReportBubble"><b>Nex Report Ads Performance</b><strong id="menuPreviewTitle">Báo cáo</strong><span>Chi phí · Tin nhắn · Đơn hàng</span><small>Số liệu lấy từ mẫu và công thức đã lưu.</small></div><div id="menuKeyboardPreview"></div></div><p id="menuPreviewFeedback" class="feedback" role="status"></p></section><p class="hint">Nút có hiệu lực 7 ngày. Khi thay đổi hành động hoặc tắt yêu cầu, lấy báo cáo mới để nhận menu mới. Ngày khác được nhập bằng lệnh hiện có.</p></aside>
+</div></div></section>
 <section id="sourcesView" aria-labelledby="sourcesTitle" hidden>
 <div class="headline"><div><div class="eyebrow"><i></i>META ADS · PANCAKE POS · SHEETS</div><h1 id="sourcesTitle">Nguồn dữ liệu</h1><p>Kết nối một lần, dùng cho nhiều mẫu báo cáo.</p></div><a href="#settings" class="secondary">Quản lý file Sheets</a></div>
 <div id="pancakeSources"></div><div class="builderGrid"><section class="panel builderPanel"><div class="sectionLine"><h2>Kết nối Meta Ads</h2><span class="pill">Quyền đọc báo cáo</span></div>

@@ -78,6 +78,7 @@ function updateState(data) {
   if (typeof setupSales === "function") setupSales(data);
   setupGroups(data);
   setupRequests(data);
+  if (typeof setupTelegramMenu === "function") setupTelegramMenu(data);
   setupTelegram(data);
   if (typeof setupBuilder === "function") setupBuilder(data);
 }
@@ -131,7 +132,8 @@ async function loadReport() {
     if (!date || !$("date").validity.valid) throw new Error("Chọn một ngày báo cáo hợp lệ.");
     const displayDate = longDate.format(new Date(date + "T00:00:00Z"));
     $("dateDescription").textContent = displayDate[0].toLocaleUpperCase("vi") + displayDate.slice(1);
-    const data = await api("report?date=" + encodeURIComponent(date) + "&group=" + encodeURIComponent($("reportGroup").value || "default"));
+    const from = new URL(location.href).searchParams.get("from");
+    const data = await api("report?date=" + encodeURIComponent(date) + "&group=" + encodeURIComponent($("reportGroup").value || "default") + (from ? "&from=" + encodeURIComponent(from) : ""));
     if (serial !== requestNumber) return;
     current = data; showReport(data); $("preview").disabled = false;
   } catch (error) {
@@ -141,7 +143,7 @@ async function loadReport() {
   } finally { if (serial === requestNumber) $("reload").disabled = false; }
 }
 $("date").addEventListener("change", () => {
-  const url = new URL(location.href); url.searchParams.set("date", $("date").value); history.replaceState(null, "", url);
+  const url = new URL(location.href); url.searchParams.set("date", $("date").value); url.searchParams.delete("from"); history.replaceState(null, "", url);
   loadReport();
 });
 $("reload").onclick = loadReport;

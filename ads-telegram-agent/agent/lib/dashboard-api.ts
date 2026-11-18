@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { dashboardState } from "./dashboard-state.ts";
 import { authenticated, passwordConfigured, passwordMatches, sessionCookie, sign, verify } from "./dashboard-auth.ts";
 import { prepareReport } from "./job.ts";
-import { deliveryKey, deliverOnce } from "./delivery.ts";
+import { deliveryKey, deliverOnce, telegramSend } from "./delivery.ts";
 import { validateDate, yesterday } from "./report.ts";
 import { connectTelegram, telegramConnection } from "./telegram-setup.ts";
 import { requestAction } from "./request-actions.ts";
@@ -15,6 +15,9 @@ import { reportHistory, recordReportRun } from "./report-history.ts";
 import { limitAdminOperation } from "./admin-rate-limit.ts";
 import {pancakeAction} from "./pancake/api.ts";
 import {pancakeWebhook} from "./pancake/webhook.ts";
+
+import { safeReportKeyboard } from "./telegram-menu.ts";
+import { menuAction } from "./telegram-menu-actions.ts";
 
 export async function dashboardApi(request: Request) {
   const url = new URL(request.url);
@@ -55,6 +58,7 @@ export async function dashboardApi(request: Request) {
     if (isPost && ["/api/metric","/api/formula-preview","/api/report-definition","/api/template-preview"].includes(url.pathname)) {
       limitAdminOperation(url.pathname);return json(200,await reportManagement(url.pathname,body));
     }
+    if (isPost && url.pathname === "/api/telegram-menu") {limitAdminOperation("telegram-menu",20);return json(200,await menuAction(body));}
     if (!isPost && url.pathname === "/api/report-history") return json(200,{runs:await reportHistory()});
     if (isPost && ["/api/request", "/api/request-preview"].includes(url.pathname)) return json(200, await requestAction(url.pathname, body));
     if (!isPost && url.pathname === "/api/telegram-status") return json(200, await telegramConnection());
@@ -69,7 +73,7 @@ export async function dashboardApi(request: Request) {
       const date = validateDate(url.searchParams.get("date") || yesterday());
       const { report, text } = await prepareReport(date, url.searchParams.get("group") || "default", {from:url.searchParams.get("from") || undefined});
       await recordReportRun({groupId:report.groupId||"default",groupName:report.groupName||"Báo cáo",from:report.range?.from||date,to:date,source:report.sourceKind||"sheets",status:"prepared",mode:"web"});
-      const id = sign({ purpose: "preview", text, date, nonce: randomUUID(),
+      const id = sign({ purpose: "preview", text, date, groupId:report.groupId||url.searchParams.get("group")||"default", from:report.range?.from||date, legacy:!report.metricValues, nonce: randomUUID(),
         destination: process.env.TELEGRAM_CHAT_ID || "", exp: Date.now() + 30 * 60000 });
       return json(200, { report, text, id });
     }
@@ -81,7 +85,8 @@ export async function dashboardApi(request: Request) {
           typeof draft.date !== "string" || typeof draft.nonce !== "string" ||
           draft.destination !== process.env.TELEGRAM_CHAT_ID)
         return json(400, { error: "Bản xem trước đã hết hạn hoặc nơi nhận đã thay đổi. Tải lại báo cáo." });
-      return json(200, await deliverOnce(deliveryKey(draft.date, "preview-" + draft.nonce), "BẢN GỬI THỬ\n\n" + draft.text));
+      return json(200, await deliverOnce(deliveryKey(draft.date, "preview-" + draft.nonce), "BẢN GỬI THỬ\n\n" + draft.text, undefined, async text => telegramSend(text,
+        typeof draft.groupId === "string" && typeof draft.from === "string" ? await safeReportKeyboard({groupId:draft.groupId,from:draft.from,to:draft.date as string,legacy:draft.legacy===true}) : undefined)));
     }
     if (isPost && ["/api/inspect", "/api/group"].includes(url.pathname))
       return json(200, await groupAction(url.pathname, body));

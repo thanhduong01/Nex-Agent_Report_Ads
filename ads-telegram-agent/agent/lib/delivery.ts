@@ -50,7 +50,9 @@ export const redisStore: DeliveryStore = {
   },
 };
 
-export async function telegramSend(text: string): Promise<number> {
+import type { InlineKeyboard } from "./telegram-menu.ts";
+
+export async function telegramSend(text: string, keyboard?: InlineKeyboard): Promise<number> {
   const chatId = process.env.TELEGRAM_CHAT_ID;
   if (!chatId) throw new DeliveryError("Thiếu TELEGRAM_CHAT_ID.", true);
   let token: string;
@@ -61,7 +63,7 @@ export async function telegramSend(text: string): Promise<number> {
   try {
     res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text, link_preview_options: { is_disabled: true } }),
+      body: JSON.stringify({ chat_id: chatId, text, link_preview_options: { is_disabled: true }, ...(keyboard ? { reply_markup: keyboard } : {}) }),
       signal: AbortSignal.timeout(20000),
     });
   } catch {

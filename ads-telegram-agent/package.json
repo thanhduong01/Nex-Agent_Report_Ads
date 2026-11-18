@@ -19,7 +19,8 @@
     "send": "node --env-file-if-exists=.env.local scripts/report.ts --send",
     "telegram:preview": "node --env-file-if-exists=.env.local scripts/report.ts --telegram-preview",
     "telegram:chat": "node --env-file-if-exists=.env.local scripts/telegram-chat.ts",
-    "ui": "node --env-file-if-exists=.env.local scripts/dashboard/server.ts"
+    "ui": "node --env-file-if-exists=.env.local scripts/dashboard/server.ts",
+    "qa:telegram-http": "node scripts/qa/telegram-menu-http.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.8.2",

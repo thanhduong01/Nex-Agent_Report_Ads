@@ -14,6 +14,8 @@ import {listPancakeConnections} from "./pancake/connections.ts";
 import {databaseConfigured} from "./pancake/database.ts";
 import {sourceFields,posStatusLabels} from "./source-catalog.ts";
 
+import { defaultMenu } from "./telegram-menu-config.ts";
+
 export async function dashboardState(cloud = false) {
   const paired = Boolean(process.env.TELEGRAM_BOT_TOKEN && /^[1-9]\d*$/.test(process.env.TELEGRAM_CHAT_ID || ""));
   const registry = await getRegistry();
@@ -26,7 +28,7 @@ export async function dashboardState(cloud = false) {
     localSendEnabled: process.env.SEND_REPORTS === "true",
     groups: registry.groups.map(group => ({ ...group, schedule: effectiveSchedule(group), nextRun: nextOccurrence(effectiveSchedule(group)) })),
     revision: registry.revision, canEditGroups: !cloud || hasGroupStorage(),
-    requests: registry.requests,
+    requests: registry.requests, telegramMenu: registry.telegramMenu || defaultMenu(),
     metaConnections: await listMetaConnections(), metrics: registry.metrics || [], metricDefinitions:metricDefinitions(registry),
     parameters:registry.parameters || {}, baseVariables, reservedMetricIds,
     sourceFields,posStatusLabels,
