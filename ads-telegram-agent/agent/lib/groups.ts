@@ -11,6 +11,8 @@ import { scheduleSchema } from "./schedule-config.ts";
 import { defaultRequests, requestSchema } from "./request-config.ts";
 import { reportDefinitionSchema, metricSchema, parametersSchema } from "./report-definition.ts";
 
+import { menuSchema } from "./telegram-menu-config.ts";
+
 export const monthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
 export const groupSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]{1,64}$/),
@@ -23,6 +25,7 @@ export const groupSchema = z.object({
 export type ReportGroup = z.infer<typeof groupSchema>;
 const registrySchema = z.object({ version: z.literal(1), revision: z.number().int().nonnegative(), groups: z.array(groupSchema).max(30),
   requests: z.array(requestSchema).max(20).default(defaultRequests),
+  telegramMenu: menuSchema.optional(),
   metrics: z.array(metricSchema).max(25).optional(), parameters: parametersSchema.optional() });
 export type Registry = z.infer<typeof registrySchema>;
 const blobPath = () => `report-config/${process.env.VERCEL_ENV || "production"}/groups.json`;

@@ -1,0 +1,15 @@
+# Telegram report buttons
+
+Approved scope: configurable inline keyboard below command, scheduled and manually sent reports. Existing command parsing, saved requests, report formulas, schedules and delivery deduplication remain authoritative.
+
+Frontend: a separate “Nút dưới báo cáo” editor within Yêu cầu bot. Enable/disable menu, add/remove/reorder buttons, label, action, saved request, current/fixed group, current/request/preset date, HTTPS link, row width and 1–3 columns. A responsive Telegram preview uses text nodes only and preserves unsaved edits during state refresh.
+
+Backend: additive optional registry.telegramMenu configuration, saved through its own authenticated revision-checked endpoint. Legacy registries receive the default keyboard without rewriting their other settings. Commands, scheduled reports and web sends attach the same keyboard to the final report chunk. No keyboard on source failure or administrative notices. The report content and formulas do not change.
+
+Callbacks: use Eve onCallbackQuery and explicitly register callback_query updates. Acknowledge immediately, authenticate private owner before storage/data access, validate a short HMAC-signed opaque context reference, then validate the currently enabled menu button and request scope. Immutable private Blob/local contexts expire after seven days and contain group/range/request references only, never report data or credentials. Dedupe each callback ID using existing delivery storage. Duplicate/ambiguous sends retain existing safeguards. Missing/deleted/disabled settings fail safely; a paused automatic schedule may still be requested manually.
+
+Actions: refresh the exact date range; day presets (Vietnam today/yesterday/last seven days/month), group chooser, campaigns, POS products, POS reconciliation, POS insights, saved requests and HTTPS web/settings links. Unsupported views are hidden. Custom dates reuse the existing command syntax with an explicit instruction and group ID, or open the web date picker; no ambiguous free-text state is introduced.
+
+Security checkpoint: existing admin session/CSRF/content-type/body limits and a save rate limit; Zod schemas and reference validation; CAS prevents cross-editor overwrites; no arbitrary callback execution; callback tokens bind to bot and owner; signature verification precedes context lookup; request group and date permissions rechecked; all text is plain text; links require HTTPS without credentials; diagnostics contain status only. Context storage failure must not prevent existing report delivery.
+
+Acceptance: default and configured menus render under every report delivery origin; all callback actions work on supported sources and respect group/range; old buttons cannot bypass changed config, ownership or request permissions; duplicate callbacks do not duplicate report sends; expired buttons return guidance; web editor persists changes without altering groups/requests/metrics/schedules; mobile layout stays within its container; all existing tests and new functional/security/DOM/API tests pass.
