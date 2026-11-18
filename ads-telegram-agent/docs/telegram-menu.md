@@ -19,3 +19,12 @@ Không thay đổi công thức, cách ghép đơn, lệnh cũ hoặc lịch cũ
 - `npm run qa:telegram-http` sau build: khởi động bản compiled trong thư mục tạm với thông tin giả, chặn mọi API bên ngoài; kiểm tra API đăng nhập/lưu, Meta report, gửi thử, webhook thật của Eve, callback trùng/sai chủ/sai secret, chọn ngày, /help và lịch gửi. Không gửi Telegram thật.
 
 Giới hạn xác minh: test DOM không thay cho quan sát bố cục trên trình duyệt thật hoặc bấm nút trong ứng dụng Telegram thật.
+
+## Kết quả phát hành 18/11/2026
+
+- 134/134 kiểm thử qua; typecheck và build thành công.
+- QA HTTP với bản compiled qua toàn bộ các luồng liệt kê ở trên, bằng dữ liệu và API giả lập tách riêng.
+- Rà soát độc lập phát hiện 6 lỗi về thứ tự khởi tạo script, qua ngày, báo cáo legacy, mã nhóm bắt đầu bằng số, gửi tin một phần và trạng thái giao diện cũ; đã sửa và có kiểm thử hồi quy.
+- Commit triển khai chức năng: bba1b20. Vercel báo thành công; HTML/JS/CSS Production khớp SHA-256 với bản đã kiểm tra. API không có phiên đăng nhập trả 401.
+- GitHub Actions [44240774674](https://github.com/thanhduong01/Nex-Agent_Report_Ads/actions/runs/44240774674) thành công: kiểm tra lịch và cập nhật kết nối Telegram, 0 lịch đến hạn, 0 lỗi; không phát sinh báo cáo trong lượt kiểm tra này.
+- Chưa quan sát bố cục bằng trình duyệt thật và chưa bấm nút trong ứng dụng Telegram thật ở phiên làm việc này.

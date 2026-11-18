@@ -43,5 +43,5 @@ Consumes: registry.telegramMenu and menuAction. Produces responsive menu editor 
 
 ### Task 4: QA and release
 - [x] Hand off full diff to fresh Test Master/reviewer per Fullstack Guardian; address verified important findings with regression tests.
-- [ ] Run full suite, compiled HTTP/auth/static asset checks and document browser limitations.
-- [ ] Commit, integrate into authorized main, push and verify production deploy + scheduler/webhook registration.
+- [x] Run full suite, compiled HTTP/auth/static asset checks and document browser limitations.
+- [x] Commit, integrate into authorized main, push and verify production deploy + scheduler/webhook registration.
