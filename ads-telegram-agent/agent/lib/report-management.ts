@@ -7,6 +7,7 @@ import { resolvePeriod } from "./report-period.ts";
 import { vietnamDate } from "./schedule-config.ts";
 import { metaCampaigns } from "./meta.ts";
 import { recordReportRun } from "./report-history.ts";
+import {botcakeConnection} from "./botcake/connections.ts";
 import {pancakeConnection} from "./pancake/connections.ts";
 
 function revision(body:Record<string,unknown>) {
@@ -79,6 +80,7 @@ export async function reportManagement(path:string,body:Record<string,unknown>) 
     return {saved:true,revision:saved.revision,group:saved.groups.find(item=>item.id===group.id)};
   }
   const definition=validateReportDefinition(body.definition,registry);
+  if(definition.botcake)for(const pageId of definition.botcake.pageIds)await botcakeConnection(pageId);
   if(path==="/api/report-definition") {
     if(definition.source==="pancake")await pancakeConnection(definition.pancakeConnectionId!,definition.shopId!);
     if(definition.source!=="sheets") {

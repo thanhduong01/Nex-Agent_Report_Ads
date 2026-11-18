@@ -1,3 +1,5 @@
+import {listBotcakeConnections} from "./botcake/connections.ts";
+import {botcakeTextVariables,botcakeAliases} from "./botcake/catalog.ts";
 import { settings } from "./config.ts";
 import { yesterday } from "./report.ts";
 
@@ -31,7 +33,7 @@ export async function dashboardState(cloud = false) {
     requests: registry.requests, telegramMenu: registry.telegramMenu || defaultMenu(),
     metaConnections: await listMetaConnections(), metrics: registry.metrics || [], metricDefinitions:metricDefinitions(registry),
     parameters:registry.parameters || {}, baseVariables, reservedMetricIds,
-    sourceFields,posStatusLabels,
+    sourceFields,posStatusLabels,botcakeConnections:await listBotcakeConnections(),botcakeTextVariables,botcakeAliases,
     pancakeConnections:await listPancakeConnections(),databaseConfigured:databaseConfigured(),
     scheduler: await readSchedulerStatus(),
     months: Object.entries(registry.groups.find(g => g.id === "default")?.sources || {}).sort(([a], [b]) => b.localeCompare(a)).map(([month, source]) =>

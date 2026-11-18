@@ -133,6 +133,7 @@ export type Report = {
   rowMetricValues?: { name: string; metrics: import("./report-service.ts").MetricResult[] }[];
   comparisonValues?: import("./report-service.ts").MetricResult[];
   customText?: string;
+  botcake?: import("./botcake/types.ts").BotcakeSummary;
   sales?: import("./pancake/types.ts").SalesReport;
 };
 

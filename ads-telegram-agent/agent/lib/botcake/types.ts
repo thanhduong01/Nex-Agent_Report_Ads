@@ -1,0 +1,14 @@
+import {z} from 'zod';
+export const pageIdSchema=z.string().regex(/^\d{1,30}$/);
+export const psidSchema=z.string().regex(/^\d{1,40}$/);
+export const customerIdSchema=z.string().regex(/^[A-Za-z0-9_-]{1,100}$/);
+export const botcakeSettingsSchema=z.object({pageIds:z.array(pageIdSchema).min(1).max(20).refine(v=>new Set(v).size===v.length)});
+export type BotcakeSettings=z.infer<typeof botcakeSettingsSchema>;
+export type CustomerFact={id:string;psid:string;phones:string[];lastInteractiveAt:string|null;adId:string|null;metadata:boolean;subscribed:boolean|null};
+export type FieldDefinition={id:number;name:string;type:number|null};
+export type FieldFact={customerId:string|null;psid:string|null;value:unknown};
+export type CursorPage<T>={data:T[];next:string|null};
+export type PhoneSource='profile'|'custom'|'both';
+export type PageConfig={id:string;name:string;pageId:string;source:PhoneSource;fieldIds:number[];revision:number;hasToken:boolean;checkedAt:string};
+export type BotcakeSummary={complete:boolean;fresh:boolean;message:string;pageNames:string[];syncedAt:string|null;startedAt:string|null;
+ metrics:Record<string,number|null>;campaigns:{id:string;name:string;phones:number|null;cost:number|null;cpa:number|null}[]};

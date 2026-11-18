@@ -1,3 +1,5 @@
+import {syncBotcakeTick} from "./botcake/sync.ts";
+import {botcakeStore} from "./botcake/store.ts";
 import { getRegistry } from "./groups.ts";
 import { dueOccurrence, effectiveSchedule } from "./schedule-config.ts";
 import { scheduledReport } from "./job.ts";
@@ -10,16 +12,16 @@ import {salesStore} from "./pancake/store.ts";
 
 const response = (status: number, body: object) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 const defaults = { verify: verifySchedulerToken, registry: getRegistry, deliver: scheduledReport,
-  record: recordSchedulerCheck, connect: connectTelegram, now: () => new Date(),sync:syncPancakeTick,
+  record: recordSchedulerCheck, connect: connectTelegram, now: () => new Date(),syncBotcake:syncBotcakeTick,sync:syncPancakeTick,
   probe:async()=>{
     const database=await databaseHealth();
-    if(database.connected)await salesStore().init();
+    if(database.connected){await salesStore().init();await (await botcakeStore()).init();}
     console.info("Reporting database health",{configured:database.configured,connected:database.connected});
     const pancake=database.connected?await syncPancakeTick():undefined;
     if(pancake)console.info("Pancake sync probe",pancake);
     return {database:{configured:database.configured,connected:database.connected},...(pancake?{pancake}:{})};
   }};
-export async function schedulerApi(request: Request, deps:Omit<typeof defaults,"sync"|"probe"> & {sync?:typeof syncPancakeTick;probe?:()=>Promise<Record<string,unknown>>} = defaults) {
+export async function schedulerApi(request: Request, deps:Omit<typeof defaults,"sync"|"probe"|"syncBotcake"> & {syncBotcake?:typeof syncBotcakeTick;sync?:typeof syncPancakeTick;probe?:()=>Promise<Record<string,unknown>>} = defaults) {
   if (request.method !== "POST") return response(405, { error: "Method not allowed" });
   if (process.env.VERCEL_ENV !== "production") return response(403, { error: "Production only" });
   const token = /^Bearer (\S+)$/.exec(request.headers.get("authorization") || "")?.[1];
@@ -44,6 +46,7 @@ export async function schedulerApi(request: Request, deps:Omit<typeof defaults,"
     if (body.mode === "check") {
       // POS failures never disable existing Sheets schedules; freshness is visible in each POS report.
       if(deps.sync)try{await deps.sync();}catch{console.warn("Pancake sync batch could not start");}
+      if(deps.syncBotcake)try{await deps.syncBotcake();}catch{console.warn("Botcake sync batch could not start");}
       const registry = await deps.registry();
       const due = registry.groups.filter(g => dueOccurrence(effectiveSchedule(g), now)).map(g => g.id);
       let telegramConnected = true;

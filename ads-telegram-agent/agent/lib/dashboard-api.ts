@@ -1,3 +1,4 @@
+import {botcakeAction} from "./botcake/api.ts";
 import { groupAction } from "./group-actions.ts";
 import { GroupError } from "./groups.ts";
 import { randomUUID } from "node:crypto";
@@ -48,6 +49,7 @@ export async function dashboardApi(request: Request) {
       return json(200, { ok: true }, { "Set-Cookie": sessionCookie(request) });
     }
     if (!authenticated(request)) return json(401, { code: "login", error: "Đăng nhập để xem báo cáo." });
+    if(isPost&&url.pathname==="/api/botcake"){limitAdminOperation("botcake",20);return json(200,await botcakeAction(body));}
     if(isPost&&url.pathname==="/api/pancake"){limitAdminOperation("pancake",20);return json(200,await pancakeAction(body,url.origin));}
     if (isPost && url.pathname === "/api/meta") { limitAdminOperation("meta",10); return json(200,await metaAction(body)); }
     if (isPost && url.pathname === "/api/meta-campaigns") {

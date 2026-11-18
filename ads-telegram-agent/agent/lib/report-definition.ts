@@ -1,9 +1,11 @@
+import {botcakeSettingsSchema} from "./botcake/types.ts";
+import {botcakeMetrics,botcakeAliases,botcakeTextVariables} from "./botcake/catalog.ts";
 import { z } from "zod";
 import {salesPolicySchema} from "./pancake/types.ts";
 import {sourceFieldMetrics} from "./source-catalog.ts";
 export const identifier=z.string().regex(/^[a-z][a-z0-9_]{0,47}$/);
-export const templateTextVariables=["ten_nhom","ky_bao_cao","chi_so","chi_tiet","so_sanh","nguon","thoi_diem_doc","mui_gio","san_pham_ban_chay","nhan_dinh","doi_soat","TRANG_THAI_DON_HANG"];
-export const templateAliases:Record<string,string>={chi_phi:"cost",tin_nhan:"messages",so_dien_thoai:"phones",chi_phi_moi_tin_nhan:"cost_per_message",chi_phi_moi_sdt:"cost_per_phone"};
+export const templateTextVariables=["ten_nhom","ky_bao_cao","chi_so","chi_tiet","so_sanh","nguon","thoi_diem_doc","mui_gio","san_pham_ban_chay","nhan_dinh","doi_soat","TRANG_THAI_DON_HANG",...Object.keys(botcakeTextVariables)];
+export const templateAliases:Record<string,string>={...botcakeAliases,chi_phi:"cost",tin_nhan:"messages",so_dien_thoai:"phones",chi_phi_moi_tin_nhan:"cost_per_message",chi_phi_moi_sdt:"cost_per_phone"};
 export const reservedMetricIds=[...templateTextVariables,...Object.keys(templateAliases)];
 export const parametersSchema=z.record(identifier,z.number().finite().min(-1e12).max(1e12))
   .refine(value=>Object.keys(value).length<=20);
@@ -13,7 +15,7 @@ export const metricSchema=z.object({
   scope:z.enum(["total","row","both"]).default("both"),
   valueMap:z.record(z.string().regex(/^-?\d+(?:\.\d+)?$/).max(40),z.string().trim().min(1).max(100)).refine(map=>Object.keys(map).length<=50).optional(),
 });
-export type CustomMetric=z.infer<typeof metricSchema> & {provider?:"meta"|"pancake"};
+export type CustomMetric=z.infer<typeof metricSchema> & {provider?:"meta"|"pancake"|"botcake"};
 export const defaultMetrics:CustomMetric[]=[
   {id:"cost",name:"Chi phí",formula:"chi_phi",unit:"currency",decimals:0,scope:"both"},
   {id:"messages",name:"Tin nhắn",formula:"tin_nhan",unit:"number",decimals:0,scope:"both"},
@@ -34,10 +36,11 @@ export const defaultMetrics:CustomMetric[]=[
   {id:"pos_matched_orders",name:"Đơn nối đúng campaign",formula:"pos_don_khop",unit:"number",decimals:0,scope:"both"},
   {id:"pos_cpa",name:"CPA đơn Pancake",formula:"pos_cpa_an_toan",unit:"currency",decimals:0,scope:"both"},
   {id:"pos_roas",name:"ROAS Pancake",formula:"pos_roas_an_toan",unit:"number",decimals:2,scope:"both"},
-  ...sourceFieldMetrics,
+  ...sourceFieldMetrics,...botcakeMetrics,
 ];
 export const periodSchema=z.enum(["today","yesterday","last7","month"]);
 export const reportDefinitionSchema=z.object({
+  botcake:botcakeSettingsSchema.optional(),
   source:z.enum(["sheets","meta","hybrid","pancake"]),
   pancakeConnectionId:z.string().regex(/^[a-z0-9-]{1,64}$/).optional(),
   shopId:z.string().regex(/^\d{1,30}$/).optional(),
@@ -53,7 +56,7 @@ export const reportDefinitionSchema=z.object({
   detail:z.enum(["summary","rows"]).default("summary"),
   constants:parametersSchema.default({}),
   body:z.string().trim().max(3000).default(""),
-}).refine(value=>value.source==="sheets"||!!(value.connectionId&&value.accountId),{message:"Chọn kết nối và tài khoản Meta."})
+}).refine(value=>!value.botcake||value.source!=="sheets",{message:"Botcake cần mẫu có nguồn Meta."}).refine(value=>value.source==="sheets"||!!(value.connectionId&&value.accountId),{message:"Chọn kết nối và tài khoản Meta."})
   .refine(value=>value.source!=="hybrid"||!!value.phoneSheetName,{message:"Chọn sản phẩm Sheets để ghép SĐT."})
   .refine(value=>value.source!=="pancake"||!!(value.pancakeConnectionId&&value.shopId),{message:"Chọn kết nối và shop Pancake."});
 export type ReportDefinition=z.infer<typeof reportDefinitionSchema>;

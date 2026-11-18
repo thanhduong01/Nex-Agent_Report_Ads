@@ -1,3 +1,4 @@
+import {botcakeVariables,botcakeMetrics} from "./botcake/catalog.ts";
 import { reservedMetricIds } from "./report-definition.ts";
 import {sourceFieldVariables,sourceFieldMetrics} from "./source-catalog.ts";
 export const baseVariables = {
@@ -9,7 +10,7 @@ export const baseVariables = {
   pos_don_hang:"Đơn Pancake theo trạng thái đã chọn",pos_doanh_thu:"Doanh thu hàng hóa Pancake sau hoàn và chiết khấu",
   pos_so_luong:"Số sản phẩm thương mại giữ lại",pos_don_khop:"Đơn Pancake nối chính xác campaign",pos_doanh_thu_khop:"Doanh thu đơn nối chính xác campaign",
   pos_cpa_an_toan:"CPA Pancake sau kiểm tra độ phủ, tiền tệ, múi giờ và độ mới",pos_roas_an_toan:"ROAS Pancake sau kiểm tra chất lượng",
-  ...sourceFieldVariables,
+  ...sourceFieldVariables,...botcakeVariables,
 };
 export type FormulaValue = { value: number | null; reason?: string };
 export type MetricExpression = { id: string; formula: string };
@@ -123,7 +124,7 @@ export function validateMetrics(definitions:MetricExpression[], constants:string
   const allowed=new Set([...Object.keys(baseVariables),...constants,"NULL"]);
   const trees=new Map<string,ReturnType<typeof parse>>();
   for(const definition of definitions) {
-    if((!/^[a-z][a-z0-9_]{0,47}$/.test(definition.id)&&!sourceFieldMetrics.some(f=>f.id===definition.id))||forbidden.has(definition.id))fail("mã chỉ số chưa hợp lệ.");
+    if((!/^[a-z][a-z0-9_]{0,47}$/.test(definition.id)&&![...sourceFieldMetrics,...botcakeMetrics].some(f=>f.id===definition.id))||forbidden.has(definition.id))fail("mã chỉ số chưa hợp lệ.");
     if(allowed.has(definition.id)||trees.has(definition.id))fail("mã chỉ số trùng biến hoặc chỉ số khác.");
     if(reservedMetricIds.includes(definition.id))fail("mã chỉ số dành riêng cho nội dung mẫu.");
     trees.set(definition.id,parse(definition.formula));
