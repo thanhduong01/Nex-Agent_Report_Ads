@@ -130,3 +130,24 @@ section, aside, form, fieldset, .sectionLine > *, .mappingGrid > * { min-width:0
 .menuTelegramCanvas .hint { color:#c8d3e1; }
 @container (max-width:1050px) { .menuWorkspace { grid-template-columns:minmax(0,1fr); } .menuPreview { max-width:600px; width:100%; } }
 @container (max-width:600px) { .menuEditor, .menuPreview .panel { padding:16px; } .menuCardFields,.menuGeneral { grid-template-columns:minmax(0,1fr); } .menuButtonCard { padding:12px; } }
+/* Botcake is an optional module. Keep its layout rules scoped. */
+.bcWorkspace { margin-bottom:24px; }
+.bcWorkspace > *, .bcTemplate, .bcLedger, .bcPages { min-width:0; max-width:100%; }
+#bcConnectionFields { border:0; padding:0; margin:0; min-width:0; }
+.bcRule { border-left:3px solid var(--primary,#2d47c4); padding:12px 16px; margin:20px 0; background:var(--surface-soft,#f3f5fc); border-radius:0 10px 10px 0; font-size:14px; }
+.bcRule p { margin:8px 0 0; color:var(--muted); line-height:1.6; }
+.bcSelectedFields { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0; }
+.bcFieldTag { display:flex; align-items:center; gap:8px; border:1px solid var(--line); padding:8px 10px; border-radius:10px; min-width:0; max-width:100%; }
+.bcFieldTag span { overflow-wrap:anywhere; min-width:0; }
+.bcFieldTag button { flex-shrink:0; min-height:44px; }
+.bcStats { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:16px 0; }
+.bcStats > div { border:1px solid var(--line); border-radius:10px; padding:14px; min-width:0; }
+.bcStats b { display:block; font-size:24px; }.bcStats small { display:block; margin-top:6px; overflow-wrap:anywhere; }
+.bcTemplate { margin:24px 0; padding:18px; border:1px solid var(--line); border-radius:12px; }
+.bcTemplate legend { padding:0 8px; font-weight:700; font-size:15px; }
+.bcPages { display:grid; gap:8px; margin:14px 0; }.bcPages .checkLabel { margin:0; overflow-wrap:anywhere; }
+.bcLedger { margin-top:24px; }.bcLedger summary { cursor:pointer; font-weight:700; min-height:44px; }
+#bcLedgerCount { align-self:center; overflow-wrap:anywhere; }
+#bcLedgerRows { margin:18px 0; min-width:0; }
+#botcakeReport { margin-top:24px; }
+@container (max-width:600px) { .bcTemplate { padding:12px; }.bcFieldTag { width:100%; justify-content:space-between; }.bcStats { gap:8px; }.bcStats > div { padding:10px; } }

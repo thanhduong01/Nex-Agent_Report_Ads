@@ -114,6 +114,7 @@ export function validateReportDefinition(input:unknown,registry:Registry):Report
   if(definition.detail==="summary"&&definition.metrics.every(id=>definitions.find(metric=>metric.id===id)?.scope==="row"))
     throw new GroupError("Mẫu tổng quan cần ít nhất một chỉ số tính cho tổng kỳ.");
   if(definition.source!=="sheets"&&!definition.campaignIds.length)throw new GroupError("Chọn ít nhất một campaign cho mẫu báo cáo.");
+  if(!definition.botcake&&(requiredInputVariables(definitions,definition.metrics).some(id=>id.startsWith("BOTCAKE_"))||/\{\{\s*(?:API_)?BOTCAKE_/.test(definition.body)))throw new GroupError("Bật bổ sung SĐT Botcake và chọn Page trước khi dùng chỉ số/biến Botcake.");
   const constants={...registry.parameters,...definition.constants};
   if(Object.keys(constants).some(key=>Object.hasOwn(valuesFor([],{}),key)||["constructor","prototype","__proto__"].includes(key)))
     throw new GroupError("Tên biến cố định trùng với biến nguồn hoặc tên dành riêng.");

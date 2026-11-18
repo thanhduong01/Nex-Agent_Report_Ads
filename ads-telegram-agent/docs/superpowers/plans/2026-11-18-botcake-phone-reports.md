@@ -46,12 +46,12 @@ Produces: optional report.botcake config, namespaced numeric/text variables, exa
 ### Task 4: Production interface
 Files: public/botcake.js, index.html, report-builder.js, app.js, sales.css, scripts/dashboard/server.ts, scripts/build-vercel.mjs.
 Produces: connection/field selection/sync/ledger UI, optional report Page selector, dropdown metrics/placeholders and responsive Telegram preview controls.
-- [ ] Write failing real-DOM tests for create/edit/CAS/dirty state, selecting Pages/metrics, formula/token insertion and unavailable-data states.
-- [ ] Implement UI using existing design and helpers; test script boot order, new local assets and mobile reflow.
-- [ ] Run DOM/API tests, all tests, typecheck/build and compiled HTTP integration.
+- [x] Write failing real-DOM tests for create/edit/CAS/dirty state, selecting Pages/metrics, formula/token insertion and unavailable-data states.
+- [x] Implement UI using existing design and helpers; test script boot order, new local assets and mobile reflow.
+- [x] Run DOM/API tests, all tests, typecheck/build and compiled HTTP integration.
 
 ### Task 5: Independent QA and production release
-- [ ] Hand off complete diff to fresh Test Master per Fullstack Guardian; fix verified important bugs with regression tests.
-- [ ] Exercise desktop/mobile and existing app flows through available browser tools, without extracting credentials.
+- [x] Hand off complete diff to fresh Test Master per Fullstack Guardian; fix verified important bugs with regression tests.
+- [x] Exercise desktop/mobile and existing app flows through available browser tools, without extracting credentials.
 - [ ] Push authorized main, verify Vercel assets/auth, run signed scheduler probe to initialize new tables.
 - [ ] Check real Botcake data after owner enters Page token through the protected website; state any genuine remaining external prerequisite.

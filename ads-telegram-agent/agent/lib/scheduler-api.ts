@@ -15,11 +15,12 @@ const defaults = { verify: verifySchedulerToken, registry: getRegistry, deliver:
   record: recordSchedulerCheck, connect: connectTelegram, now: () => new Date(),syncBotcake:syncBotcakeTick,sync:syncPancakeTick,
   probe:async()=>{
     const database=await databaseHealth();
-    if(database.connected){await salesStore().init();await (await botcakeStore()).init();}
+    let botcake:{ready:boolean}|undefined;
+    if(database.connected){await salesStore().init();try{await (await botcakeStore()).init();botcake={ready:true};}catch{botcake={ready:false};console.warn('Botcake schema probe incomplete');}}
     console.info("Reporting database health",{configured:database.configured,connected:database.connected});
     const pancake=database.connected?await syncPancakeTick():undefined;
     if(pancake)console.info("Pancake sync probe",pancake);
-    return {database:{configured:database.configured,connected:database.connected},...(pancake?{pancake}:{})};
+    return {database:{configured:database.configured,connected:database.connected},...(pancake?{pancake}:{}),...(botcake?{botcake}:{})};
   }};
 export async function schedulerApi(request: Request, deps:Omit<typeof defaults,"sync"|"probe"|"syncBotcake"> & {syncBotcake?:typeof syncBotcakeTick;sync?:typeof syncPancakeTick;probe?:()=>Promise<Record<string,unknown>>} = defaults) {
   if (request.method !== "POST") return response(405, { error: "Method not allowed" });

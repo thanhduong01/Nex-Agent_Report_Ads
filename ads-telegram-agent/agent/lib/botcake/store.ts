@@ -16,6 +16,7 @@ const migrations=[
  `CREATE INDEX IF NOT EXISTS nex_botcake_psid ON nex_reporting.botcake_customers(page_id,psid)`,
  `CREATE TABLE IF NOT EXISTS nex_reporting.botcake_phones(page_id text NOT NULL,phone_key text NOT NULL,encrypted_phone text NOT NULL,source_psid text,customer_id text,
   baseline boolean NOT NULL DEFAULT false,recorded_day date,frozen_ad_id text,last_interactive_at timestamptz,first_seen_at timestamptz NOT NULL DEFAULT now(),last_seen_at timestamptz NOT NULL DEFAULT now(),recorded_at timestamptz,PRIMARY KEY(page_id,phone_key))`,
+ `CREATE INDEX IF NOT EXISTS nex_botcake_phone_psid ON nex_reporting.botcake_phones(page_id,source_psid)`,
  `CREATE INDEX IF NOT EXISTS nex_botcake_day ON nex_reporting.botcake_phones(page_id,recorded_day)`,
  `CREATE TABLE IF NOT EXISTS nex_reporting.botcake_jobs(id text PRIMARY KEY,page_id text NOT NULL,source_key text NOT NULL,config jsonb NOT NULL,baseline boolean NOT NULL,stage integer NOT NULL DEFAULT 0,cursor text NOT NULL DEFAULT '',state text NOT NULL DEFAULT 'queued',lease text,lease_until timestamptz,created_at timestamptz NOT NULL DEFAULT now(),finished_at timestamptz,last_error text)`,
  `CREATE UNIQUE INDEX IF NOT EXISTS nex_botcake_job_open ON nex_reporting.botcake_jobs(page_id) WHERE state IN ('queued','running','failed')`,
@@ -96,13 +97,28 @@ export class BotcakeStore{
  async checkpoint(job:BotcakeJob,stage:number,cursor:string){await this.db.transaction(async tx=>{await this.owned(tx,job);await tx.query(`UPDATE nex_reporting.botcake_jobs SET stage=$3,cursor=$4,lease_until=now()+interval '90 seconds' WHERE id=$1 AND lease=$2`,[job.id,job.lease,stage,cursor]);});job.stage=stage;job.cursor=cursor;}
  async release(job:BotcakeJob){await this.db.query(`UPDATE nex_reporting.botcake_jobs SET state='queued',lease=NULL,lease_until=NULL WHERE id=$1 AND lease=$2`,[job.id,job.lease]);}
  async finish(job:BotcakeJob){await this.db.transaction(async tx=>{await this.owned(tx,job);await tx.query(`UPDATE nex_reporting.botcake_jobs SET state='complete',finished_at=now(),lease=NULL,lease_until=NULL,last_error=NULL WHERE id=$1 AND lease=$2`,[job.id,job.lease]);await tx.query(`UPDATE nex_reporting.botcake_scopes SET baseline_at=COALESCE(baseline_at,now()),synced_at=now(),last_error=NULL WHERE page_id=$1 AND source_key=$2`,[job.pageId,job.sourceKey]);});}
- async fail(job:BotcakeJob){await this.db.transaction(async tx=>{await tx.query(`UPDATE nex_reporting.botcake_jobs SET state='failed',lease=NULL,lease_until=NULL,last_error='Đồng bộ chưa hoàn tất; tiến độ được giữ.' WHERE id=$1 AND lease=$2`,[job.id,job.lease]);await tx.query(`UPDATE nex_reporting.botcake_scopes SET last_error='Đồng bộ chưa hoàn tất; tiến độ được giữ.' WHERE page_id=$1 AND source_key=$2`,[job.pageId,job.sourceKey]);});}
+ async fail(job:BotcakeJob){await this.db.transaction(async tx=>{const changed=await tx.query(`UPDATE nex_reporting.botcake_jobs SET state='failed',lease=NULL,lease_until=NULL,last_error='Đồng bộ chưa hoàn tất; tiến độ được giữ.' WHERE id=$1 AND lease=$2 AND state='running' RETURNING id`,[job.id,job.lease]);if(!changed.rows.length)return;await tx.query(`UPDATE nex_reporting.botcake_scopes SET last_error='Đồng bộ chưa hoàn tất; tiến độ được giữ.' WHERE page_id=$1 AND source_key=$2`,[job.pageId,job.sourceKey]);});}
  async status(pageId:string){await this.init();const scope=(await this.db.query(`SELECT * FROM nex_reporting.botcake_scopes WHERE page_id=$1`,[pageId])).rows[0];
   const count=(await this.db.query(`SELECT count(*)::int AS total,count(*) FILTER(WHERE baseline)::int AS baseline,count(*) FILTER(WHERE NOT baseline AND recorded_day IS NOT NULL)::int AS fresh,count(*) FILTER(WHERE NOT baseline AND recorded_day IS NULL)::int AS pending FROM nex_reporting.botcake_phones WHERE page_id=$1`,[pageId])).rows[0];
   const customers=(await this.db.query(`SELECT count(*)::int AS total FROM nex_reporting.botcake_customers WHERE page_id=$1`,[pageId])).rows[0];
   const job=(await this.db.query(`SELECT state,stage,cursor,baseline FROM nex_reporting.botcake_jobs WHERE page_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1`,[pageId])).rows[0];
   return {pageId,startedAt:iso(scope?.baseline_at),syncedAt:iso(scope?.synced_at),sourceKey:scope?.source_key||null,lastError:scope?.last_error||null,
    phoneCount:Number(count.total),baselineCount:Number(count.baseline),newCount:Number(count.fresh),pendingCount:Number(count.pending),customerCount:Number(customers.total),job:job?{state:String(job.state),stage:Number(job.stage),baseline:!!job.baseline}:null};
+ }
+ async reportSnapshot(pageIds:string[],range:{from:string;to:string}){
+  await this.init();return this.db.transaction(async tx=>{
+   await tx.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
+   const scopes=(await tx.query(`SELECT * FROM nex_reporting.botcake_scopes WHERE page_id=ANY($1::text[])`,[pageIds])).rows;
+   const pages=[];
+   for(const pageId of pageIds){const scope=scopes.find(s=>s.page_id===pageId);
+    const counts=(await tx.query(`SELECT count(*) FILTER(WHERE p.first_seen_at<=s.synced_at AND p.first_seen_at<($2::date+interval '1 day') AT TIME ZONE 'Asia/Ho_Chi_Minh')::int AS total,
+     count(*) FILTER(WHERE NOT p.baseline AND p.first_seen_at<=s.synced_at AND (p.recorded_at IS NULL OR p.recorded_at>s.synced_at))::int AS pending
+     FROM nex_reporting.botcake_phones p JOIN nex_reporting.botcake_scopes s USING(page_id) WHERE p.page_id=$1`,[pageId,range.to])).rows[0];
+    pages.push({pageId,total:Number(counts.total),pending:Number(counts.pending),status:{startedAt:iso(scope?.baseline_at),syncedAt:iso(scope?.synced_at),sourceKey:scope?.source_key||null,lastError:scope?.last_error||null}});
+   }
+   const rows=(await tx.query(`SELECT p.page_id,p.recorded_day::text,p.frozen_ad_id FROM nex_reporting.botcake_phones p JOIN nex_reporting.botcake_scopes s USING(page_id) WHERE p.page_id=ANY($1::text[]) AND NOT p.baseline AND p.recorded_day BETWEEN $2::date AND $3::date AND p.recorded_at<=s.synced_at`,[pageIds,range.from,range.to])).rows.map(r=>({pageId:String(r.page_id),day:String(r.recorded_day),adId:r.frozen_ad_id as string|null}));
+   return {pages,rows};
+  });
  }
  async reportRows(pageIds:string[],from:string,to:string){await this.init();return (await this.db.query(`SELECT p.page_id,p.recorded_day::text,p.frozen_ad_id FROM nex_reporting.botcake_phones p JOIN nex_reporting.botcake_scopes s USING(page_id) WHERE p.page_id=ANY($1::text[]) AND NOT p.baseline AND p.recorded_day BETWEEN $2::date AND $3::date AND p.recorded_at<=s.synced_at`,[pageIds,from,to])).rows.map(r=>({pageId:String(r.page_id),day:String(r.recorded_day),adId:r.frozen_ad_id as string|null}));}
  async pendingSnapshot(pageId:string){await this.init();return Number((await this.db.query(`SELECT count(*)::int AS n FROM nex_reporting.botcake_phones p JOIN nex_reporting.botcake_scopes s USING(page_id) WHERE p.page_id=$1 AND NOT p.baseline AND p.first_seen_at<=s.synced_at AND (p.recorded_at IS NULL OR p.recorded_at>s.synced_at)`,[pageId])).rows[0].n);}

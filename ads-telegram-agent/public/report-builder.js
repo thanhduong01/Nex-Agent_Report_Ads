@@ -34,9 +34,9 @@ function pickerOptions(select,items,query="",placeholder="Chọn một trường
   }
   select.value=options.some(item=>item.id===current)?current:"";
 }
-function metricProvider(metric){return state.metrics?.some(m=>m.id===metric.id)?'Chỉ số tự tính':metric.provider==='pancake'||/^pos_/.test(metric.id)?'Pancake POS':metric.provider==='meta'?'Meta Ads Insights':'Chỉ số chung / Meta / Sheets';}
+function metricProvider(metric){return state.metrics?.some(m=>m.id===metric.id)?'Chỉ số tự tính':metric.provider==='botcake'?'Botcake':metric.provider==='pancake'||/^pos_/.test(metric.id)?'Pancake POS':metric.provider==='meta'?'Meta Ads Insights':'Chỉ số chung / Meta / Sheets';}
 function renderFormulaPicker(){
-  const variables=[...Object.entries(state.baseVariables||{}).map(([id,name])=>({id,name,group:(id.startsWith('pos_')||id.startsWith('POS_'))?'Pancake POS':(id.startsWith('meta_')||id.startsWith('META_'))?'Meta Ads Insights':'Chỉ số chung / Meta / Sheets'})),
+  const variables=[...Object.entries(state.baseVariables||{}).map(([id,name])=>({id,name,group:id.startsWith('BOTCAKE_')?'Botcake':(id.startsWith('pos_')||id.startsWith('POS_'))?'Pancake POS':(id.startsWith('meta_')||id.startsWith('META_'))?'Meta Ads Insights':'Chỉ số chung / Meta / Sheets'})),
     ...Object.keys(state.parameters||{}).map(id=>({id,name:id,group:'Biến cố định'})),...(state.metrics||[]).filter(m=>m.id!==metricEditingId).map(m=>({id:m.id,name:m.name,group:'Chỉ số tự tính'}))];
   pickerOptions($("formulaVariableSelect"),variables,$("formulaVariableSearch").value);
 }
@@ -76,6 +76,7 @@ function setupBuilder(data) {
     const selectedConnection=$("tplConnection").value,selectedAccount=$("tplAccount").value;
     builderSelect($("tplConnection"),data.metaConnections||[],selectedConnection,"Chọn kết nối");
     builderMetricOrder=builderMetricOrder.filter(id=>(data.metricDefinitions||[]).some(metric=>metric.id===id));
+    if(typeof renderBotcakePages==="function")renderBotcakePages([...$("tplBotcakePages").querySelectorAll("input")].filter(input=>input.checked).map(n=>n.value));
     builderAccounts(selectedAccount);renderBuilderChoices();
     if(typeof fillSalesTemplateShops==="function"){const selectedPos=$("tplPosConnection").value,shop=$("tplPosShop").value;builderSelect($("tplPosConnection"),data.pancakeConnections||[],selectedPos,"Chọn kết nối Pancake");fillSalesTemplateShops(shop);}
   }
@@ -103,6 +104,7 @@ function builderAccountInfo() {
 function fillBuilderGroup() {
   const group=state.groups.find(item=>item.id===builderGroupId),definition=group?.report;
   builderBase=builderTemplateVersion(group);
+  if(typeof fillBotcakeTemplate==="function")fillBotcakeTemplate(definition);
   if(typeof fillSalesTemplate==="function")fillSalesTemplate(definition);
   $("tplName").value=group?.name||"";
   $("tplSource").value=definition?.source||"sheets";
@@ -129,6 +131,7 @@ function fillBuilderGroup() {
   builderPreviewVersion++;$("tplPreview").disabled=false;renderBuilderChoices();builderSourceFields();renderBuilderCampaigns();
 }
 function builderSourceFields() {
+  if(typeof botcakeTemplateFields==="function")botcakeTemplateFields();
   const source=$("tplSource").value;
   $("tplStatusMapping").hidden=source!=="pancake";
   if($("tplPosFields")){ $("tplPosFields").hidden=source!=="pancake"; for(const id of ["tplPosConnection","tplPosShop","tplPosCpa","tplPosMinimum"]){$(id).required=source==="pancake";} for(const input of $("tplPosFields").querySelectorAll("input,select"))input.disabled=source!=="pancake"; }
@@ -174,7 +177,7 @@ function renderBuilderChoices() {
   let labels={};try{labels=builderValueMap($("tplStatusLabels").value,true);}catch{/* Keep typing; validation runs when saved. */}
   const definitions=(state.metricDefinitions||[]).map(metric=>{const code=/^API_POS_STATUS_(\d+)$/.exec(metric.id)?.[1];return code&&labels[code]?{...metric,name:"POS · Số đơn trạng thái "+code+" · "+labels[code]}:metric;});
   const order=[...builderMetricOrder];
-  pickerOptions($("tplMetricSelect"),definitions.filter(m=>!builderMetricOrder.includes(m.id)).map(m=>({id:m.id,name:m.name,group:metricProvider(m)})),$("tplMetricSearch").value,"Chọn chỉ số cần thêm");
+  pickerOptions($("tplMetricSelect"),definitions.filter(m=>!builderMetricOrder.includes(m.id)&&(m.provider!=="botcake"||$("tplBotcakeEnabled")?.checked&&$("tplSource").value!=="sheets")).map(m=>({id:m.id,name:m.name,group:metricProvider(m)})),$("tplMetricSearch").value,"Chọn chỉ số cần thêm");
   $("tplMetricList").replaceChildren(...order.map(id=>definitions.find(metric=>metric.id===id)).filter(Boolean).map(metric=>{
     const row=el("div",undefined,"builderMetricChoice"),label=el("label",undefined,"checkLabel"),input=el("input");input.type="checkbox";input.checked=builderMetricOrder.includes(metric.id);
     const text=el("span");text.append(el("b",metric.name),el("small",metric.formula));
@@ -191,14 +194,18 @@ function renderBuilderChoices() {
     return row;
   }));
   const variables=["ten_nhom","ky_bao_cao","chi_so","chi_tiet","so_sanh","nguon","thoi_diem_doc","mui_gio","san_pham_ban_chay","nhan_dinh","doi_soat","TRANG_THAI_DON_HANG"];
-  pickerOptions($("tplPlaceholderSelect"),[...variables.map(id=>({id,name:"{{"+id+"}}",group:"Nội dung báo cáo"})),...builderMetricOrder.map(id=>definitions.find(m=>m.id===id)).filter(m=>m&&m.scope!=="row").map(m=>({id:m.id,name:m.name,group:metricProvider(m)}))],$("tplPlaceholderSearch").value);
+  const useBotcake=$("tplBotcakeEnabled")?.checked&&$("tplSource").value!=="sheets";
+  const selectedMetrics=builderMetricOrder.map(id=>definitions.find(m=>m.id===id)).filter(m=>m&&m.scope!=="row");
+  const bcText=useBotcake?Object.entries(state.botcakeTextVariables||{}).map(([id,name])=>({id,name,group:'Botcake · nội dung'})):[];
+  const bcNumbers=useBotcake?Object.entries(state.botcakeAliases||{}).filter(([,id])=>builderMetricOrder.includes(id)).map(([id,target])=>({id,name:definitions.find(m=>m.id===target)?.name||id,group:'Botcake · chỉ số đã chọn'})):[];
+  pickerOptions($("tplPlaceholderSelect"),[...variables.map(id=>({id,name:"{{"+id+"}}",group:"Nội dung báo cáo"})),...bcText,...bcNumbers,...selectedMetrics.map(m=>({id:m.id,name:m.name,group:metricProvider(m)}))],$("tplPlaceholderSearch").value);
 }
 function templateDraft() {
   const source=$("tplSource").value;
   if(!builderMetricOrder.length)throw Error("Chọn ít nhất một chỉ số.");
   if(source!=="sheets"&&!builderCampaignIds.length)throw Error("Chọn ít nhất một campaign cho mẫu.");
   if(builderCampaignIds.length>100)throw Error("Tối đa 100 campaign trong một mẫu.");
-  return {source,...(source!=="sheets"?{connectionId:$("tplConnection").value,accountId:$("tplAccount").value,campaignIds:builderCampaignIds,
+  return {source,...(typeof botcakeTemplateDraft==="function"?botcakeTemplateDraft():{}),...(source!=="sheets"?{connectionId:$("tplConnection").value,accountId:$("tplAccount").value,campaignIds:builderCampaignIds,
     messageAction:$("tplMessageAction").value==="custom"?$("tplMessageCustom").value.trim():$("tplMessageAction").value}:{}),
     ...(source==="hybrid"?{phoneSheetName:$("tplPhoneProduct").value}:{}),
     ...(source==="pancake"?salesTemplateDraft():{}),

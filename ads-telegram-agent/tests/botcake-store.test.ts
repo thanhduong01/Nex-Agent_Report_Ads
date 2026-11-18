@@ -51,3 +51,8 @@ test('a delayed older customer detail cannot demote an already recorded new phon
  assert.equal((await store.status('456')).newCount,1);
  const rows=await store.ledger(['456'],{from:'2000-01-01',to:'2099-12-31'},0);assert.equal(rows.rows.find(r=>r.adId==='900')?.baseline,false);
 });
+test('Botcake report snapshot exposes only committed completed data with matching totals and pending scope',async t=>{
+ const {store}=await fixture(t);await baseline(store);const day=new Date(Date.now()+7*3600000).toISOString().slice(0,10);let job=await start(store);await store.profiles(job,[fact('0967890123','160',new Date().toISOString(),'99')]);
+ const partial=await store.reportSnapshot(['456'],{from:day,to:day});assert.equal(partial.rows.length,0);assert.equal(partial.pages[0].total,1);
+ await store.finish(job);const complete=await store.reportSnapshot(['456'],{from:day,to:day});assert.equal(complete.rows.length,1);assert.equal(complete.pages[0].total,2);assert.equal(complete.pages[0].pending,0);
+});

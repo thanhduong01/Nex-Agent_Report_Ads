@@ -40,7 +40,11 @@ export class BotcakeClient{
   catch{throw new GroupError('Botcake: không kết nối được API. Tiến độ được giữ để thử lại.',503);}
   if(!response.ok){await response.body?.cancel();throw new GroupError(response.status===401||response.status===403?'Botcake: token chưa có quyền truy cập Page. Kiểm tra token và Page ID.':response.status===429?'Botcake: API đang giới hạn lượt gọi. Hệ thống sẽ thử lại.':'Botcake: API tạm lỗi (HTTP '+response.status+'). Tiến độ được giữ để thử lại.',response.status===429?429:502);}
   let value:unknown;
-  try{const text=await response.text();if(text.length>2_000_000)throw invalid();value=JSON.parse(text);}catch{throw invalid();}
+  try{
+   const reader=response.body?.getReader();if(!reader)throw invalid();let text='',bytes=0;const decoder=new TextDecoder();
+   while(true){const part=await reader.read();if(part.done)break;bytes+=part.value.byteLength;if(bytes>2_000_000){await reader.cancel();throw invalid();}text+=decoder.decode(part.value,{stream:true});}
+   text+=decoder.decode();value=JSON.parse(text);
+  }catch{throw invalid();}
   return {value:unwrap(value),headers:response.headers};
  }
  async customers(pageId:string,after=''):Promise<CursorPage<CustomerFact>>{
@@ -63,8 +67,7 @@ export class BotcakeClient{
    const fresh=rows.map(v=>{if(!object(v)||!Number.isSafeInteger(Number(v.id))||Number(v.id)<1||typeof v.name!=='string'||v.name.length>200)throw invalid();return {id:Number(v.id),name:v.name,type:Number.isInteger(v.type)?v.type:null};});
    if(!fresh.length||fresh.every(f=>result.some(r=>r.id===f.id)))return result;
    result.push(...fresh.filter(f=>!result.some(r=>r.id===f.id)));
-   // The endpoint has legacy offset pages with no completion metadata; stop when its page is short.
-   if(rows.length<100)return result;
+   // API custom_fields pages contain 50 rows. Only empty/repeated pages prove completion.
   }
   throw new GroupError('Botcake: quá nhiều Custom Field. Chọn lại nguồn trước khi tiếp tục.',502);
  }

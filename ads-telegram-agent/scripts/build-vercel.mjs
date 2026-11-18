@@ -12,7 +12,7 @@ for (const args of [["run", "typecheck"], ["test"]]) {
   const check = spawnSync("npm", args, { cwd: app, stdio: "inherit", env: checkEnv });
   if (check.error || check.status !== 0) process.exit(check.status || 1);
 }
-for (const file of ["sales.js", "app.js", "groups.js", "requests.js", "telegram-menu.js", "telegram.js", "report-builder.js"]) {
+for (const file of ["botcake.js", "sales.js", "app.js", "groups.js", "requests.js", "telegram-menu.js", "telegram.js", "report-builder.js"]) {
   const check = spawnSync(process.execPath, ["--check", "public/" + file], { cwd: app, stdio: "inherit", env: checkEnv });
   if (check.error || check.status !== 0) process.exit(check.status || 1);
 }

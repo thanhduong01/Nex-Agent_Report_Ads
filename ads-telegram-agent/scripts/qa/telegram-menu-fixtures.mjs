@@ -16,6 +16,11 @@ globalThis.fetch=async function(input,options={}){
   }
   if(!old)return Response.json({result:0});old.state=payload[4];return Response.json({result:1});
  }
+ if(u.hostname==='botcake.io'){
+  if(u.pathname.endsWith('/customer'))return Response.json({success:true,data:[]},{headers:{'x-next-after':''}});
+  if(u.pathname.endsWith('/custom_fields'))return Response.json({success:true,data:u.searchParams.get('page')==='0'?[{id:4,name:'Stored phone',type:1}]:[]});
+  throw new Error('Unexpected Botcake QA endpoint');
+ }
  if(u.hostname==='graph.facebook.com'&&u.pathname.endsWith('/campaigns'))return Response.json({data:[{id:'10',name:'QA campaign',effective_status:'ACTIVE'}]});
  if(u.hostname==='graph.facebook.com')return Response.json({data:[{campaign_id:'10',campaign_name:'QA campaign',spend:'120000',impressions:'1000',inline_link_clicks:'20',actions:[{action_type:'onsite_conversion.messaging_conversation_started_7d',value:'12'}],action_values:[]}]});
  if(['127.0.0.1','localhost'].includes(u.hostname))return actual(input,options);

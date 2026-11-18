@@ -36,3 +36,9 @@ test('Botcake fields bulk retain customer identity and safe cursor; API errors n
  t.mock.method(globalThis,'fetch',async()=>Response.json({success:false,message:'sensitive upstream details test-token-abcdefghijklmnop'}, {status:401}));
  await assert.rejects(new BotcakeClient('test-token-abcdefghijklmnop').info('456','123'),error=>!/sensitive|test-token/.test((error as Error).message)&&/Botcake/.test((error as Error).message));
 });
+
+test('Botcake stops oversized streamed responses before buffering the entire body',async t=>{
+ const original=globalThis.fetch;t.after(()=>{globalThis.fetch=original;});let chunks=0,cancelled=false;
+ globalThis.fetch=async()=>new Response(new ReadableStream({pull(controller){chunks++;if(chunks>6){controller.close();return;}controller.enqueue(new Uint8Array(1_000_001));},cancel(){cancelled=true;}}));
+ await assert.rejects(new BotcakeClient('qaFakeTokenNeverLog').customers('123'),/định dạng/);assert(cancelled);assert(chunks<=4);
+});

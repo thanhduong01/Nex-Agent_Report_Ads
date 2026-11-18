@@ -75,6 +75,7 @@ function updateState(data) {
   $("botBadge").className = "pill " + (paired && data.scheduler?.telegramConnected !== false ? "good" : "warn");
   $("token").required = !data.hasToken;
   $("tokenHint").textContent = data.hasToken ? "Để trống để dùng token đã lưu, hoặc nhập token của bot mới." : "Token được lưu trên máy sau khi ghép nối.";
+  if (typeof setupBotcake === "function") setupBotcake(data);
   if (typeof setupSales === "function") setupSales(data);
   setupGroups(data);
   setupRequests(data);
@@ -88,6 +89,7 @@ function summaryMetric(id, total, count, currency = "VND") {
   $(id + "Note").textContent = total.known + "/" + count + " sản phẩm đã nhập";
 }
 function showReport({ report }) {
+  if(typeof renderBotcakeReport==="function")renderBotcakeReport(report);
   const { rows, totals } = report;
   summaryMetric("cost", totals.cost, rows.length, report.currency || "VND");
   summaryMetric("messages", totals.messages, rows.length);
@@ -126,6 +128,7 @@ async function loadReport() {
   $("preview").disabled = true; current = undefined;
   for (const id of ["cost", "messages", "phones"]) { $(id).textContent = "—"; $(id + "Note").textContent = ""; }
   $("quality").textContent = "Đang đọc dữ liệu"; $("quality").className = "pill";
+  if(typeof renderBotcakeReport==="function")renderBotcakeReport();
   $("rows").replaceChildren(); $("tableNote").textContent = "Đang đọc nguồn báo cáo…";
   $("reload").disabled = true;
   try {
